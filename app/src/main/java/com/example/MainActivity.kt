@@ -22,10 +22,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -67,6 +69,8 @@ import com.example.ui.auth.signOutFromGoogle
 import com.example.ui.screens.AnalyticsAndProfileTab
 import com.example.ui.screens.CalendarTab
 import com.example.ui.screens.DiaryEntryEditorScreen
+import com.example.ui.screens.FutureLetterComposerScreen
+import com.example.ui.screens.FutureLettersTab
 import com.example.ui.screens.JournalHomeTab
 import com.example.ui.screens.SearchAndTagsTab
 import com.example.ui.theme.MyApplicationTheme
@@ -109,6 +113,7 @@ enum class DiaryTab(
 ) {
     JOURNAL(R.string.nav_journal, Icons.Filled.Book, Icons.Outlined.Book, "nav_tab_journal"),
     CALENDAR(R.string.nav_calendar, Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth, "nav_tab_calendar"),
+    LETTERS(R.string.nav_letters, Icons.Filled.Mail, Icons.Outlined.Mail, "nav_tab_letters"),
     SEARCH(R.string.nav_search, Icons.Filled.Search, Icons.Outlined.Search, "nav_tab_search"),
     ANALYTICS(R.string.nav_analytics, Icons.Filled.AutoGraph, Icons.Outlined.AutoGraph, "nav_tab_analytics")
 }
@@ -164,10 +169,12 @@ fun AuthenticatedDiaryShell(
 
     var currentTab by rememberSaveable { mutableStateOf(DiaryTab.JOURNAL) }
     var isEditorOpen by rememberSaveable { mutableStateOf(false) }
+    var isFutureLetterComposerOpen by rememberSaveable { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<DiaryEntry?>(null) }
     var editorInitialDateIso by rememberSaveable { mutableStateOf<String?>(null) }
 
     val entriesState by viewModel.entriesState.collectAsStateWithLifecycle()
+    val futureLetters by viewModel.futureLettersState.collectAsStateWithLifecycle()
     val selectedDateIso by viewModel.selectedDateIso.collectAsStateWithLifecycle()
     val calendarYear by viewModel.calendarYear.collectAsStateWithLifecycle()
     val calendarMonthZeroBased by viewModel.calendarMonthZeroBased.collectAsStateWithLifecycle()
@@ -179,7 +186,7 @@ fun AuthenticatedDiaryShell(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
 
-    if (currentTab != DiaryTab.JOURNAL && !isEditorOpen) {
+    if (currentTab != DiaryTab.JOURNAL && !isEditorOpen && !isFutureLetterComposerOpen) {
         BackHandler { currentTab = DiaryTab.JOURNAL }
     }
 
@@ -198,6 +205,28 @@ fun AuthenticatedDiaryShell(
                 isPinUnlocked = true
             }
         )
+    }
+
+    if (isFutureLetterComposerOpen) {
+        FutureLetterComposerScreen(
+            isSaving = isSaving,
+            onDismiss = { isFutureLetterComposerOpen = false },
+            onSaveLetter = { unlockDateIso, mood, title, content, hopeOrGoal, photos ->
+                viewModel.saveFutureLetter(
+                    unlockDateIso = unlockDateIso,
+                    mood = mood,
+                    title = title,
+                    content = content,
+                    hopeOrGoal = hopeOrGoal,
+                    photosBase64 = photos,
+                    onSaved = {
+                        isFutureLetterComposerOpen = false
+                        currentTab = DiaryTab.LETTERS
+                    }
+                )
+            }
+        )
+        return
     }
 
     if (isEditorOpen) {
@@ -355,7 +384,9 @@ fun AuthenticatedDiaryShell(
                                 currentTab = DiaryTab.SEARCH
                             },
                             onJumpToCalendar = { currentTab = DiaryTab.CALENDAR },
-                            onDeleteEntry = { entryId -> viewModel.deleteDiaryEntry(entryId) }
+                            onDeleteEntry = { entryId -> viewModel.deleteDiaryEntry(entryId) },
+                            futureLetters = futureLetters,
+                            onOpenFutureLetters = { currentTab = DiaryTab.LETTERS }
                         )
                         DiaryTab.CALENDAR -> CalendarTab(
                             entries = entries,
@@ -380,6 +411,12 @@ fun AuthenticatedDiaryShell(
                                 viewModel.toggleTagFilter(tag)
                                 currentTab = DiaryTab.SEARCH
                             }
+                        )
+                        DiaryTab.LETTERS -> FutureLettersTab(
+                            letters = futureLetters,
+                            onOpenComposer = { isFutureLetterComposerOpen = true },
+                            onUnlockLetterEarly = { letter -> viewModel.unlockLetterEarly(letter) },
+                            onDeleteLetter = { letterId -> viewModel.deleteDiaryEntry(letterId) }
                         )
                         DiaryTab.SEARCH -> SearchAndTagsTab(
                             allEntries = entries,

@@ -1,16 +1,16 @@
 <resources>
-    <string name="app_name">Мой Дневник</string>
-    <string name="app_subtitle">Простой и уютный личный дневник</string>
+    <string name="app_name">Vent</string>
+    <string name="app_subtitle">Ваш уютный личный дневник</string>
     <string name="sign_in_google">Войти через Google</string>
     <string name="sign_in_welcome_title">Место для ваших мыслей</string>
     <string name="sign_in_welcome_body">Записывайте как прошел день, отмечайте настроение и возвращайтесь к воспоминаниям прошлых лет.</string>
     <string name="nav_journal">Дневник</string>
     <string name="nav_calendar">Календарь</string>
+    <string name="nav_letters">Письма</string>
     <string name="nav_search">Поиск</string>
     <string name="nav_analytics">Аналитика</string>
     <string name="new_entry_button">Записать день</string>
     <string name="on_this_day_title">В этот день в прошлые годы</string>
-    <string name="seed_memories_button">Добавить примеры прошлых лет</string>
     <string name="pin_unlock_title">Дневник закрыт</string>
     <string name="pin_unlock_subtitle">Введите 4-значный PIN-код для входа</string>
     <string name="search_placeholder">Поиск по мыслям или #тегам…</string>

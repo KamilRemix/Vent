@@ -65,7 +65,7 @@ class DiaryViewModel(
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
     // Two-Tier Kotlin Flow Error Handling Architecture
-    val entriesState: StateFlow<UiState<List<DiaryEntry>>> = repository
+    private val allUserDocumentsState: StateFlow<UiState<List<DiaryEntry>>> = repository
         .observeEntries(currentUserId)
         .map<List<DiaryEntry>, UiState<List<DiaryEntry>>> { UiState.Success(it) }
         .catch { error ->
@@ -76,6 +76,33 @@ class DiaryViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
             initialValue = UiState.Loading
+        )
+
+    val entriesState: StateFlow<UiState<List<DiaryEntry>>> = allUserDocumentsState
+        .map { state ->
+            when (state) {
+                is UiState.Loading -> UiState.Loading
+                is UiState.Error -> state
+                is UiState.Success -> UiState.Success(state.data.filter { !it.isFutureLetter() })
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = UiState.Loading
+        )
+
+    val futureLettersState: StateFlow<List<DiaryEntry>> = allUserDocumentsState
+        .map { state ->
+            (state as? UiState.Success)?.data
+                ?.filter { it.isFutureLetter() }
+                ?.sortedBy { it.dateIso }
+                .orEmpty()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = emptyList()
         )
 
     val filteredSearchEntries: StateFlow<List<DiaryEntry>> = combine(
@@ -252,6 +279,69 @@ class DiaryViewModel(
                 _statusBannerMessage.value = "Все записи очищены"
             }.onFailure { err ->
                 _statusBannerMessage.value = err.localizedMessage ?: "Не удалось очистить записи"
+            }
+        }
+    }
+
+    fun saveFutureLetter(
+        unlockDateIso: String,
+        mood: BotanicalMood,
+        title: String,
+        content: String,
+        hopeOrGoal: String?,
+        photosBase64: List<String>,
+        onSaved: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            val writtenToday = DateAndPhotoUtils.todayIso()
+            val capsuleId = "capsule_${unlockDateIso}_${java.util.UUID.randomUUID().toString().take(6)}"
+            val result = repository.saveEntry(
+                entryId = capsuleId,
+                dateIso = unlockDateIso,
+                mood = mood,
+                moodIntensity = mood.defaultIntensity,
+                title = title.trim().ifBlank { "Письмо себе в будущее" },
+                content = content.trim(),
+                reflectionPrompt = "WRITTEN_AT:$writtenToday",
+                reflectionAnswer = hopeOrGoal?.trim()?.takeIf { it.isNotBlank() },
+                tags = listOf("письмо_в_будущее"),
+                photosBase64 = photosBase64,
+                isExistingDocument = false
+            )
+            _isSaving.value = false
+            result.onSuccess {
+                _statusBannerMessage.value = "Письмо запечатано до ${DateAndPhotoUtils.formatShortRussianDate(unlockDateIso)}"
+                onSaved()
+            }.onFailure { err ->
+                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось сохранить письмо"
+            }
+        }
+    }
+
+    fun unlockLetterEarly(letter: DiaryEntry) {
+        if (letter.id.isBlank()) return
+        viewModelScope.launch {
+            _isSaving.value = true
+            val today = DateAndPhotoUtils.todayIso()
+            val result = repository.saveEntry(
+                entryId = letter.id,
+                dateIso = today,
+                mood = letter.botanicalMood(),
+                moodIntensity = letter.moodIntensity,
+                title = letter.title,
+                content = letter.content,
+                reflectionPrompt = letter.reflectionPrompt ?: "WRITTEN_AT:${letter.writtenDateIso()}",
+                reflectionAnswer = letter.reflectionAnswer,
+                tags = letter.tags,
+                photosBase64 = letter.photosBase64,
+                isExistingDocument = true
+            )
+            _isSaving.value = false
+            result.onSuccess {
+                _statusBannerMessage.value = "Печать снята — письмо открыто"
+            }.onFailure { err ->
+                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось открыть письмо"
             }
         }
     }

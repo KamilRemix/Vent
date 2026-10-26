@@ -53,6 +53,28 @@ object DateAndPhotoUtils {
         return calendarToIso(cal)
     }
 
+    fun shiftMonthsIso(dateIso: String, monthsOffset: Int): String {
+        val cal = parseIsoToCalendar(dateIso)
+        cal.add(Calendar.MONTH, monthsOffset)
+        return calendarToIso(cal)
+    }
+
+    fun daysBetween(fromDateIso: String, toDateIso: String): Int {
+        val fromCal = parseIsoToCalendar(fromDateIso)
+        val toCal = parseIsoToCalendar(toDateIso)
+        val diffMillis = toCal.timeInMillis - fromCal.timeInMillis
+        return kotlin.math.round(diffMillis / (1000.0 * 60 * 60 * 24)).toInt()
+    }
+
+    fun formatDaysRemainingLabel(days: Int): String {
+        return when {
+            days <= 0 -> "Готово к открытию"
+            days % 10 == 1 && days % 100 != 11 -> "Откроется через $days день"
+            days % 10 in 2..4 && days % 100 !in 12..14 -> "Откроется через $days дня"
+            else -> "Откроется через $days дней"
+        }
+    }
+
     fun calendarToIso(cal: Calendar): String {
         val y = cal.get(Calendar.YEAR)
         val m = cal.get(Calendar.MONTH) + 1

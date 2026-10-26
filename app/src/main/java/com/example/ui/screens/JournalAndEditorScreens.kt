@@ -106,7 +106,9 @@ fun JournalHomeTab(
     onEditEntry: (DiaryEntry) -> Unit,
     onTagClicked: (String) -> Unit,
     onJumpToCalendar: () -> Unit,
-    onDeleteEntry: ((String) -> Unit)? = null
+    onDeleteEntry: ((String) -> Unit)? = null,
+    futureLetters: List<DiaryEntry> = emptyList(),
+    onOpenFutureLetters: () -> Unit = {}
 ) {
     val selectedMonthDay = if (selectedDateIso.length >= 10) selectedDateIso.substring(5, 10) else ""
     val selectedYearPrefix = selectedDateIso.take(4)
@@ -320,6 +322,59 @@ fun JournalHomeTab(
                                 { onDeleteEntry(entry.id) }
                             } else null
                         )
+                    }
+                }
+            }
+        }
+
+        // Future Letters / Time Capsule Banner Card on Home Screen
+        item {
+            val todayIso = DateAndPhotoUtils.todayIso()
+            val readyCount = futureLetters.count { it.isUnlocked(todayIso) }
+            val sealedCount = futureLetters.size - readyCount
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenFutureLetters() }
+                    .testTag("home_future_letters_card"),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SealedEnvelopeIllustration(
+                        isUnlocked = readyCount > 0,
+                        size = 48.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Письмо себе в будущее",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = when {
+                                readyCount > 0 -> "Готово к открытию: $readyCount • Нажмите, чтобы прочитать"
+                                sealedCount > 0 -> "Запечатано писем в пути: $sealedCount"
+                                else -> "Запечатайте послание себе на месяц или год вперед"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    FilledTonalButton(
+                        onClick = onOpenFutureLetters,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(if (readyCount > 0) "Открыть" else "Письма", maxLines = 1)
                     }
                 }
             }

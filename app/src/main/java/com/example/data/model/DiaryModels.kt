@@ -100,6 +100,9 @@ data class DiaryEntry(
 ) {
     fun botanicalMood(): BotanicalMood = BotanicalMood.fromKey(moodKey)
     fun mood(): BotanicalMood = botanicalMood()
+    fun isFutureLetter(): Boolean = id.startsWith("capsule_") || reflectionPrompt?.startsWith("WRITTEN_AT:") == true
+    fun writtenDateIso(): String = reflectionPrompt?.removePrefix("WRITTEN_AT:")?.takeIf { it.length == 10 } ?: dateIso
+    fun isUnlocked(todayIso: String): Boolean = dateIso <= todayIso
 }
 
 object ReflectionPrompts {
@@ -112,6 +115,14 @@ object ReflectionPrompts {
         "Как я сегодня позаботился(ась) о себе и своем покое?",
         "Какой разговор или момент сегодняшнего дня хочется сохранить в памяти?",
         "В чем я сейчас больше всего нуждаюсь — в поддержке, тишине или отдыхе?"
+    )
+
+    val futureLetterPrompts = listOf(
+        "За что вы хотите сказать спасибо себе сегодняшнему?",
+        "Какую главную мечту или цель вы надеетесь осуществить к моменту открытия этого письма?",
+        "О чем вы сейчас переживаете, но хотите напомнить себе, что всё наладится?",
+        "Какое теплое напутствие и слова поддержки вы хотите передать себе в будущее?",
+        "Что сейчас приносит вам радость и ощущение дома?"
     )
 
     val suggestedTags = listOf(
