@@ -1,0 +1,6 @@
+{
+  "name": "Мой Дневник",
+  "description": "Простой и уютный личный дневник с отметками настроения, фото-заметками, календарем воспоминаний прошлых лет и аналитикой.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

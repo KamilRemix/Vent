@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDiaryEntry(data) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.userId.size() >= 1 &&
+             data.userId.size() <= 128 &&
+             data.dateIso is string &&
+             data.dateIso.size() == 10 &&
+             data.dateIso.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             data.monthDay is string &&
+             data.monthDay.size() == 5 &&
+             data.monthDay.matches('^[0-9]{2}-[0-9]{2}$') &&
+             data.moodKey is string &&
+             data.moodKey in ['BLOOM', 'CALM_LEAF', 'WARM_ROOT', 'MIST_FERN', 'AUTUMN_WIND', 'WINTER_SEED'] &&
+             data.moodIntensity is int &&
+             data.moodIntensity >= 1 &&
+             data.moodIntensity <= 5 &&
+             data.title is string &&
+             data.title.size() <= 200 &&
+             data.content is string &&
+             data.content.size() >= 1 &&
+             data.content.size() <= 10000 &&
+             (!('reflectionPrompt' in data) || data.reflectionPrompt == null || (data.reflectionPrompt is string && data.reflectionPrompt.size() <= 500)) &&
+             (!('reflectionAnswer' in data) || data.reflectionAnswer == null || (data.reflectionAnswer is string && data.reflectionAnswer.size() <= 5000)) &&
+             data.tags is list &&
+             data.tags.size() <= 15 &&
+             (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 60)) &&
+             data.photosBase64 is list &&
+             data.photosBase64.size() <= 4 &&
+             (data.photosBase64.size() == 0 || (data.photosBase64[0] is string && data.photosBase64[0].size() <= 350000)) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/entries/{entryId} {
+      allow get: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    isValidId(entryId) &&
+                    existing().userId == request.auth.uid;
+
+      allow list: if isSignedIn() &&
+                     request.auth.uid == userId &&
+                     existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(entryId) &&
+                       incoming().keys().hasAll([
+                         'userId',
+                         'dateIso',
+                         'monthDay',
+                         'moodKey',
+                         'moodIntensity',
+                         'title',
+                         'content',
+                         'tags',
+                         'photosBase64',
+                         'createdAt',
+                         'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId',
+                         'dateIso',
+                         'monthDay',
+                         'moodKey',
+                         'moodIntensity',
+                         'title',
+                         'content',
+                         'reflectionPrompt',
+                         'reflectionAnswer',
+                         'tags',
+                         'photosBase64',
+                         'createdAt',
+                         'updatedAt'
+                       ]) &&
+                       isValidDiaryEntry(incoming());
+
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(entryId) &&
+                       isValidDiaryEntry(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'dateIso',
+                         'monthDay',
+                         'moodKey',
+                         'moodIntensity',
+                         'title',
+                         'content',
+                         'reflectionPrompt',
+                         'reflectionAnswer',
+                         'tags',
+                         'photosBase64',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(entryId) &&
+                       existing().userId == request.auth.uid;
+    }
+  }
+}
