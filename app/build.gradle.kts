@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.soulherbarium.kxmzqp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 5
+    versionName = "2.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -106,11 +106,12 @@ dependencies {
   // implementation(libs.androidx.navigation.compose)
   // implementation(libs.androidx.room.ktx)
   // implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
+  implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
-  // implementation(libs.firebase.ai)
+  implementation(libs.firebase.ai)
   // Uncomment to use Firestore:
   implementation(libs.firebase.firestore)
+  implementation(libs.firebase.storage)
 
   // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
   // Sign-In via Credential Manager:
@@ -118,8 +119,9 @@ dependencies {
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
-  // implementation(libs.firebase.appcheck.recaptcha)
-  // implementation(libs.firebase.appcheck.debug)
+  implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.firebase.appcheck.recaptcha)
+  implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   // implementation(libs.logging.interceptor)
@@ -149,3 +151,37 @@ tasks.withType<Test> {
   timeout.set(Duration.ofMinutes(2))
   testLogging { events("passed", "failed", "skipped") }
 }
+
+abstract class ExportApkTask : DefaultTask() {
+  @get:InputFile
+  abstract val apkFile: RegularFileProperty
+
+  @get:OutputFile
+  abstract val outputVentApk: RegularFileProperty
+
+  @TaskAction
+  fun export() {
+    val src = apkFile.get().asFile
+    val dest = outputVentApk.get().asFile
+    val strayV2 = dest.parentFile.resolve("Vent_v2.apk")
+    if (strayV2.exists()) {
+      strayV2.delete()
+    }
+    if (src.exists()) {
+      src.copyTo(dest, overwrite = true)
+    }
+  }
+}
+
+val exportApk by tasks.registering(ExportApkTask::class) {
+  apkFile.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+  outputVentApk.set(rootProject.layout.projectDirectory.file("Vent.apk"))
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+  finalizedBy(exportApk)
+}
+
+
+
+

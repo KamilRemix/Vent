@@ -1,35 +1,18 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,234 +20,160 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.MarkEmailRead
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
-import com.example.data.model.ReflectionPrompts
-import com.example.ui.components.BotanicalHeroArtCard
 import com.example.ui.components.BotanicalMoodIllustration
-import com.example.ui.components.BotanicalMoodSelectorGrid
 import com.example.util.DateAndPhotoUtils
+import com.example.util.LocalAppLanguage
+import com.example.util.tr
+import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
-import java.util.TimeZone
 
-@Composable
-fun SealedEnvelopeIllustration(
-    isUnlocked: Boolean,
-    size: Dp = 56.dp,
-    modifier: Modifier = Modifier
-) {
-    val bgColor = if (isUnlocked) Color(0xFFF7EFE0) else Color(0xFFF5E5E0)
-    val envelopeStroke = if (isUnlocked) Color(0xFFB8863B) else Color(0xFFA95C47)
-    val sealColor = if (isUnlocked) Color(0xFF4A6B53) else Color(0xFFC87A5B)
-
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(bgColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(size * 0.64f)) {
-            val w = this.size.width
-            val h = this.size.height
-            val stroke = Stroke(width = w * 0.075f)
-
-            // Envelope body
-            val envTop = h * 0.22f
-            val envHeight = h * 0.62f
-            drawRoundRect(
-                color = Color(0xFFFFFBF7),
-                topLeft = Offset(w * 0.08f, envTop),
-                size = Size(w * 0.84f, envHeight),
-                cornerRadius = CornerRadius(w * 0.08f, w * 0.08f)
-            )
-            drawRoundRect(
-                color = envelopeStroke,
-                topLeft = Offset(w * 0.08f, envTop),
-                size = Size(w * 0.84f, envHeight),
-                cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
-                style = stroke
-            )
-
-            // Envelope flap
-            val flapPath = Path().apply {
-                moveTo(w * 0.1f, envTop + h * 0.03f)
-                lineTo(w * 0.5f, envTop + envHeight * 0.56f)
-                lineTo(w * 0.9f, envTop + h * 0.03f)
-            }
-            drawPath(path = flapPath, color = envelopeStroke, style = stroke)
-
-            // Wax seal circle in center
-            val sealCenter = Offset(w * 0.5f, envTop + envHeight * 0.54f)
-            drawCircle(
-                color = sealColor,
-                radius = w * 0.15f,
-                center = sealCenter
-            )
-            drawCircle(
-                color = Color(0xFFFFFBF7),
-                radius = w * 0.05f,
-                center = sealCenter
-            )
-        }
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FutureLettersTab(
-    letters: List<DiaryEntry>,
-    onOpenComposer: () -> Unit,
-    onUnlockLetterEarly: (DiaryEntry) -> Unit,
+    futureLetters: List<DiaryEntry>,
+    todayIso: String,
+    onComposeLetter: () -> Unit,
+    onOpenUnlockedLetter: (DiaryEntry) -> Unit,
     onDeleteLetter: (String) -> Unit
 ) {
-    val todayIso = remember { DateAndPhotoUtils.todayIso() }
-    val unlockedLetters = remember(letters, todayIso) {
-        letters.filter { it.isUnlocked(todayIso) }.sortedByDescending { it.dateIso }
-    }
-    val sealedLetters = remember(letters, todayIso) {
-        letters.filter { !it.isUnlocked(todayIso) }.sortedBy { it.dateIso }
+    val lang = LocalAppLanguage.current
+
+    // Refresh current time tick every 15 seconds so minute-level letters unlock live on screen
+    var nowTick by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000L)
+            nowTick = System.currentTimeMillis()
+        }
     }
 
-    var openedLetterForReading by remember { mutableStateOf<DiaryEntry?>(null) }
-    var clickedSealedLetter by remember { mutableStateOf<DiaryEntry?>(null) }
+    val unlockedLetters = remember(futureLetters, todayIso, nowTick) {
+        futureLetters.filter { it.isUnlocked(todayIso) }
+            .sortedByDescending { it.dateIso }
+    }
+    val sealedLetters = remember(futureLetters, todayIso, nowTick) {
+        futureLetters.filter { !it.isUnlocked(todayIso) }
+            .sortedBy { it.unlockTimestampMillis() }
+    }
 
-    if (openedLetterForReading != null) {
-        val letter = openedLetterForReading!!
-        FutureLetterReaderDialog(
-            letter = letter,
-            onDismiss = { openedLetterForReading = null },
-            onDelete = {
-                if (letter.id.isNotBlank()) {
-                    onDeleteLetter(letter.id)
-                }
-                openedLetterForReading = null
-            }
+    var selectedSealedLetter by remember { mutableStateOf<DiaryEntry?>(null) }
+
+    // Sealed Letter Dialog: Strictly NO early unlock or content spoilers!
+    selectedSealedLetter?.let { sealed ->
+        val writtenDate = DateAndPhotoUtils.formatFullDate(sealed.writtenDateIso(), lang)
+        val unlockDate = DateAndPhotoUtils.formatFullDate(sealed.dateIso, lang)
+        val unlockTime = sealed.unlockTimeHhMm()
+        val exactCountdown = DateAndPhotoUtils.formatExactCountdown(
+            unlockDateIso = sealed.dateIso,
+            unlockHourOfDay = sealed.unlockHour(),
+            unlockMinute = sealed.unlockMinute(),
+            lang = lang
         )
-    }
 
-    if (clickedSealedLetter != null) {
-        val sealed = clickedSealedLetter!!
-        val daysLeft = DateAndPhotoUtils.daysBetween(todayIso, sealed.dateIso).coerceAtLeast(1)
         AlertDialog(
-            onDismissRequest = { clickedSealedLetter = null },
+            onDismissRequest = { selectedSealedLetter = null },
             icon = {
-                SealedEnvelopeIllustration(isUnlocked = false, size = 56.dp)
+                Icon(
+                    imageVector = Icons.Default.LockClock,
+                    contentDescription = tr("Sealed Letter", "Письмо запечатано"),
+                    tint = MaterialTheme.colorScheme.primary
+                )
             },
             title = {
                 Text(
-                    text = "Письмо запечатано",
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
+                    tr("Time Capsule Sealed", "Письмо запечатано"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "«${sealed.title}»",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Написано: ${DateAndPhotoUtils.formatShortRussianDate(sealed.writtenDateIso())}",
+                        text = tr(
+                            "This letter is securely sealed until its scheduled unlock date and time. To preserve the surprise for your future self, its title and contents remain hidden.",
+                            "Это письмо надежно запечатано до назначенной даты и времени открытия. Чтобы сохранить интригу для вас в будущем, заголовок и текст письма скрыты."
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = "Дата открытия: ${DateAndPhotoUtils.formatShortRussianDate(sealed.dateIso)} (${DateAndPhotoUtils.formatDaysRemainingLabel(daysLeft).lowercase()})",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Смысл капсулы времени — прочитать свои мысли именно тогда, когда наступит выбранный день. Но при необходимости вы можете снять печать досрочно.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = tr("Sent on: $writtenDate", "Отправлено: $writtenDate"),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = tr(
+                                    "Unlocks on: $unlockDate at $unlockTime",
+                                    "Откроется: $unlockDate в $unlockTime"
+                                ),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = exactCountdown,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = { clickedSealedLetter = null }) {
-                    Text("Подождать даты")
+                Button(
+                    onClick = { selectedSealedLetter = null },
+                    modifier = Modifier.testTag("dismiss_sealed_dialog_button")
+                ) {
+                    Text(tr("Got It", "Понятно"))
                 }
             },
             dismissButton = {
-                Row {
-                    TextButton(
-                        onClick = {
-                            onUnlockLetterEarly(sealed)
-                            val unlockedCopy = sealed.copy(dateIso = todayIso)
-                            clickedSealedLetter = null
-                            openedLetterForReading = unlockedCopy
-                        }
-                    ) {
-                        Text("Открыть досрочно")
-                    }
-                    if (sealed.id.isNotBlank()) {
-                        TextButton(
-                            onClick = {
-                                onDeleteLetter(sealed.id)
-                                clickedSealedLetter = null
-                            }
-                        ) {
-                            Text("Удалить", color = MaterialTheme.colorScheme.error)
-                        }
-                    }
+                TextButton(
+                    onClick = {
+                        onDeleteLetter(sealed.id)
+                        selectedSealedLetter = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(tr("Delete", "Удалить"))
                 }
             }
         )
@@ -273,305 +182,1127 @@ fun FutureLettersTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("future_letters_lazy_column"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("future_letters_list"),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 1. Time Capsule Hero Banner
         item {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                BotanicalHeroArtCard(height = 148.dp)
-                Column(
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+                                )
+                            )
+                        )
+                        .padding(20.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Письма в будущее",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = Color(0xFF2C2623)
-                            )
-                            Text(
-                                text = "Послания самому себе сквозь время",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF5A514B)
-                            )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.HourglassTop,
+                                        contentDescription = tr("Time Capsule", "Капсула времени"),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tr("TIME CAPSULE", "КАПСУЛА ВРЕМЕНИ"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr("Letters to Your Future Self", "Письма себе в будущее"),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
-                        SealedEnvelopeIllustration(
-                            isUnlocked = unlockedLetters.isNotEmpty(),
-                            size = 52.dp
+
+                        Text(
+                            text = tr(
+                                "Send a message, wish, or reminder into the future. Pick the exact day and time — your letter stays sealed until that moment, and Android will send you a push notification even if the app is closed.",
+                                "Отправьте послание, мечту или напоминание в будущее. Выберите точный день и время — письмо будет запечатано до этой минуты, а Android пришлет уведомление, даже если приложение закрыто."
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onOpenComposer,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("write_future_letter_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mail,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Написать письмо себе в будущее", maxLines = 1)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = onComposeLetter,
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .testTag("compose_future_letter_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    tr("Write Future Letter", "Написать письмо в будущее"),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // Ready to open section
-        if (unlockedLetters.isNotEmpty()) {
+        // 2. Stats Pill Row
+        if (futureLetters.isNotEmpty()) {
             item {
-                Text(
-                    text = "Готовы к открытию (${unlockedLetters.size})",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            items(unlockedLetters, key = { it.id.ifBlank { it.dateIso } }) { letter ->
-                UnlockedFutureLetterCard(
-                    letter = letter,
-                    onClick = { openedLetterForReading = letter }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockOpen,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "${unlockedLetters.size}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr("Ready to Read", "Открыто"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockClock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "${sealedLetters.size}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr("Sealed", "Запечатано"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Sealed letters waiting for their date
-        if (sealedLetters.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Запечатанные в пути (${sealedLetters.size})",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-            items(sealedLetters, key = { it.id.ifBlank { it.dateIso } }) { letter ->
-                val daysLeft = DateAndPhotoUtils.daysBetween(todayIso, letter.dateIso).coerceAtLeast(1)
-                SealedFutureLetterCard(
-                    letter = letter,
-                    daysRemaining = daysLeft,
-                    onClick = { clickedSealedLetter = letter }
-                )
-            }
-        }
-
-        // Clean empty state when user has no letters yet
-        if (letters.isEmpty()) {
+        // 3. Empty State with Botanical Wax-Sealed Envelope Vector Illustration & Soft Gradient
+        if (futureLetters.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    shape = RoundedCornerShape(26.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 ) {
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.22f),
+                                        MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                            )
+                            .padding(horizontal = 24.dp, vertical = 32.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        SealedEnvelopeIllustration(isUnlocked = false, size = 68.dp)
-                        Text(
-                            text = "У вас пока нет писем в будущее",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Напишите себе слова поддержки, сохраните сегодняшние мечты или фотографии и выберите дату — через месяц, полгода или год. Письмо останется запечатанным до этого дня.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        FilledTonalButton(
-                            onClick = onOpenComposer,
-                            modifier = Modifier.fillMaxWidth()
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("Создать первое письмо", maxLines = 1)
+                            SealedLetterBotanicalIllustration(
+                                modifier = Modifier.size(116.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = tr("No Time Capsule Letters Yet", "Пока нет писем в будущее"),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = tr(
+                                    "Write a letter to yourself 1 month, 6 months, or 1 year from now. It will stay sealed with a botanical wax stamp until the exact day and minute you choose.",
+                                    "Напишите письмо себе через месяц, полгода или год. Оно останется надежно запечатанным до выбранного дня и минуты."
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            FilledTonalButton(
+                                onClick = onComposeLetter,
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.EditCalendar,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    tr("Create First Time Capsule", "Создать первое письмо"),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
+            }
+        }
+
+        // 4. Unlocked Letters Section
+        if (unlockedLetters.isNotEmpty()) {
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = tr(
+                            "Unlocked Letters (${unlockedLetters.size})",
+                            "Открытые письма (${unlockedLetters.size})"
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            items(unlockedLetters, key = { it.id }) { letter ->
+                UnlockedFutureLetterCard(
+                    letter = letter,
+                    onClick = { onOpenUnlockedLetter(letter) }
+                )
+            }
+        }
+
+        // 5. Sealed Letters Section (Strictly NO title/content spoilers!)
+        if (sealedLetters.isNotEmpty()) {
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LockClock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = tr(
+                            "Sealed in Time Capsule (${sealedLetters.size})",
+                            "Запечатаны в капсуле времени (${sealedLetters.size})"
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            items(sealedLetters, key = { it.id }) { letter ->
+                SealedFutureLetterCard(
+                    letter = letter,
+                    onClick = { selectedSealedLetter = letter }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun UnlockedFutureLetterCard(
+fun UnlockedFutureLetterCard(
     letter: DiaryEntry,
     onClick: () -> Unit
 ) {
+    val lang = LocalAppLanguage.current
     val mood = letter.botanicalMood()
+    val writtenDate = DateAndPhotoUtils.formatShortDate(letter.writtenDateIso(), lang)
+    val unlockedDate = DateAndPhotoUtils.formatShortDate(letter.dateIso, lang)
+    val unlockTime = letter.unlockTimeHhMm()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .border(
-                width = 1.5.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(22.dp)
-            )
+            .clickable(onClick = onClick)
             .testTag("unlocked_letter_card_${letter.id}"),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
+                .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SealedEnvelopeIllustration(isUnlocked = true, size = 48.dp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(8.dp)
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.LockOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(
-                            text = "Печать снята • Можно прочитать",
+                            text = tr(
+                                "Unlocked • $unlockedDate $unlockTime",
+                                "Открыто • $unlockedDate $unlockTime"
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                Text(
+                    text = tr("Sent on $writtenDate", "Отправлено $writtenDate"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BotanicalMoodIllustration(
+                    mood = mood,
+                    size = 44.dp
+                )
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = letter.title.ifBlank { "Письмо себе в будущее" },
+                        text = letter.title.ifBlank { tr("Letter from the Past", "Письмо из прошлого") },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Написано ${DateAndPhotoUtils.formatShortRussianDate(letter.writtenDateIso())} • Настроение: ${mood.titleRu}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = letter.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-            Button(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.MarkEmailRead,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = tr("Open Letter →", "Прочитать письмо →"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Открыть и прочитать письмо", maxLines = 1)
             }
         }
     }
 }
 
+/**
+ * SealedFutureLetterCard:
+ * Strictly displays ONLY:
+ * - Status "Sealed" / "Запечатано"
+ * - Sent date ("Sent on [date]" / "Отправлено [date]")
+ * - Unlock date & time + exact countdown
+ * NEVER shows `letter.title` or `letter.content` preview!
+ */
 @Composable
-private fun SealedFutureLetterCard(
+fun SealedFutureLetterCard(
     letter: DiaryEntry,
-    daysRemaining: Int,
     onClick: () -> Unit
 ) {
-    val mood = letter.botanicalMood()
+    val lang = LocalAppLanguage.current
+    val writtenDate = DateAndPhotoUtils.formatShortDate(letter.writtenDateIso(), lang)
+    val unlockDate = DateAndPhotoUtils.formatShortDate(letter.dateIso, lang)
+    val unlockTime = letter.unlockTimeHhMm()
+    val exactCountdown = DateAndPhotoUtils.formatExactCountdown(
+        unlockDateIso = letter.dateIso,
+        unlockHourOfDay = letter.unlockHour(),
+        unlockMinute = letter.unlockMinute(),
+        lang = lang
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(onClick = onClick)
             .testTag("sealed_letter_card_${letter.id}"),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            SealedEnvelopeIllustration(isUnlocked = false, size = 50.dp)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
+                modifier = Modifier.size(50.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = tr("Sealed", "Запечатано"),
                         tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = DateAndPhotoUtils.formatDaysRemainingLabel(daysRemaining),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.Bold
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(3.dp))
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = tr("Sealed", "Запечатано"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(
+                        text = tr("Sent on $writtenDate", "Отправлено $writtenDate"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Text(
-                    text = letter.title.ifBlank { "Письмо себе в будущее" },
-                    style = MaterialTheme.typography.titleMedium,
+                    text = tr(
+                        "Unlocks $unlockDate at $unlockTime",
+                        "Откроется: $unlockDate в $unlockTime"
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = exactCountdown,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Написано: ${DateAndPhotoUtils.formatShortRussianDate(letter.writtenDateIso())} (${mood.titleRu})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Откроется: ${DateAndPhotoUtils.formatShortRussianDate(letter.dateIso)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun FutureLetterComposerScreen(
+    todayIso: String,
+    isUploadingPhoto: Boolean,
+    onUploadPhoto: (Uri, (String) -> Unit) -> Unit,
+    onSaveLetter: (
+        unlockDateIso: String,
+        unlockHour: Int,
+        unlockMinute: Int,
+        title: String,
+        content: String,
+        mood: BotanicalMood,
+        photoUrls: List<String>
+    ) -> Unit,
+    onCancel: () -> Unit
+) {
+    BackHandler(onBack = onCancel)
+    val lang = LocalAppLanguage.current
+
+    var unlockDateIso by remember {
+        mutableStateOf(DateAndPhotoUtils.shiftMonthsIso(todayIso, 1))
+    }
+    var unlockHour by remember { mutableStateOf(9) }
+    var unlockMinute by remember { mutableStateOf(0) }
+
+    var title by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    var selectedMood by remember { mutableStateOf(BotanicalMood.WARM_ROOT) }
+    var photoUrls by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null && photoUrls.size < 4) {
+            onUploadPhoto(uri) { uploadedUrl ->
+                if (photoUrls.size < 4) {
+                    photoUrls = photoUrls + uploadedUrl
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val initialMillis = remember(unlockDateIso) {
+            runCatching {
+                LocalDate.parse(unlockDateIso)
+                    .atStartOfDay(ZoneId.of("UTC"))
+                    .toInstant()
+                    .toEpochMilli()
+            }.getOrDefault(System.currentTimeMillis() + 86_400_000L)
+        }
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val picked = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.of("UTC"))
+                                .toLocalDate()
+                            val minDate = LocalDate.parse(todayIso)
+                            unlockDateIso = if (picked.isBefore(minDate)) {
+                                minDate.toString()
+                            } else {
+                                picked.toString()
+                            }
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text(tr("Select Date", "Выбрать дату"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(tr("Cancel", "Отмена"))
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = unlockHour,
+            initialMinute = unlockMinute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = {
+                Text(
+                    tr("Select Unlock Time", "Выберите время открытия"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        unlockHour = timePickerState.hour
+                        unlockMinute = timePickerState.minute
+                        showTimePicker = false
+                    }
+                ) {
+                    Text(tr("Save Time", "Сохранить время"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text(tr("Cancel", "Отмена"))
+                }
+            }
+        )
+    }
+
+    val formattedTime = DateAndPhotoUtils.formatTimeHhMm(unlockHour, unlockMinute)
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = tr("Letter to the Future", "Письмо в будущее"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val shortUnlock = DateAndPhotoUtils.formatShortDate(unlockDateIso, lang)
+                        Text(
+                            text = tr(
+                                "Unlocks $shortUnlock at $formattedTime",
+                                "Откроется $shortUnlock в $formattedTime"
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onCancel,
+                        modifier = Modifier.testTag("cancel_future_letter_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = tr("Back", "Назад")
+                        )
+                    }
+                },
+                actions = {
+                    Button(
+                        onClick = {
+                            onSaveLetter(
+                                unlockDateIso,
+                                unlockHour,
+                                unlockMinute,
+                                title,
+                                content,
+                                selectedMood,
+                                photoUrls
+                            )
+                        },
+                        enabled = !isUploadingPhoto && (title.isNotBlank() || content.isNotBlank()),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .testTag("seal_future_letter_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(tr("Seal Letter", "Запечатать"), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            // 1. Unlock Date & Time Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EventAvailable,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = tr(
+                                    "When should this letter unlock?",
+                                    "Когда должно открыться письмо?"
+                                ),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            // Line 1: Full date (with day of week) and time
+                            Text(
+                                text = "${DateAndPhotoUtils.formatFullDate(unlockDateIso, lang)} • $formattedTime",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            // Line 2: Remaining time in muted color
+                            Text(
+                                text = DateAndPhotoUtils.formatExactCountdown(
+                                    unlockDateIso = unlockDateIso,
+                                    unlockHourOfDay = unlockHour,
+                                    unlockMinute = unlockMinute,
+                                    lang = lang
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    val datePresets = listOf(
+                        tr("In 1 Week", "Через 1 нед.") to DateAndPhotoUtils.shiftDateIso(todayIso, daysOffset = 7),
+                        tr("In 1 Month", "Через 1 мес.") to DateAndPhotoUtils.shiftMonthsIso(todayIso, 1),
+                        tr("In 3 Months", "Через 3 мес.") to DateAndPhotoUtils.shiftMonthsIso(todayIso, 3),
+                        tr("In 6 Months", "Через 6 мес.") to DateAndPhotoUtils.shiftMonthsIso(todayIso, 6),
+                        tr("In 1 Year", "Через 1 год") to DateAndPhotoUtils.shiftDateIso(todayIso, yearsOffset = 1)
+                    )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Quick 2-minute test preset so the user can test background push notifications right away!
+                        AssistChip(
+                            onClick = {
+                                val cal = Calendar.getInstance().apply {
+                                    add(Calendar.MINUTE, 2)
+                                }
+                                unlockDateIso = DateAndPhotoUtils.calendarToIso(cal)
+                                unlockHour = cal.get(Calendar.HOUR_OF_DAY)
+                                unlockMinute = cal.get(Calendar.MINUTE)
+                            },
+                            label = { Text(tr("In 2 min", "Через 2 мин.")) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.NotificationsActive,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        )
+
+                        datePresets.forEach { (label, dateStr) ->
+                            val selected = unlockDateIso == dateStr
+                            FilterChip(
+                                selected = selected,
+                                onClick = { unlockDateIso = dateStr },
+                                label = { Text(label) },
+                                leadingIcon = if (selected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null
+                            )
+                        }
+
+                        AssistChip(
+                            onClick = { showDatePicker = true },
+                            label = { Text(tr("Pick Date...", "Выбрать дату...")) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarMonth,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.testTag("pick_custom_unlock_date_button")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // Time Selection Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = tr("Unlock Time", "Время открытия"),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr(
+                                        "Push notification arrives at $formattedTime",
+                                        "Уведомление придет ровно в $formattedTime"
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        FilledTonalButton(
+                            onClick = { showTimePicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("pick_custom_unlock_time_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AccessTime,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(formattedTime, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 2. Mood Selection
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = tr("How are you feeling as you write this?", "С каким настроением вы пишете письмо?"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(BotanicalMood.entries) { mood ->
+                        val isSelected = mood == selectedMood
+                        val bgColor by animateColorAsState(
+                            if (isSelected) mood.softBgColor
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            label = "letterMoodBg"
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = bgColor,
+                            border = BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) mood.primaryColor
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier
+                                .clickable { selectedMood = mood }
+                                .testTag("letter_mood_${mood.key}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                BotanicalMoodIllustration(
+                                    mood = mood,
+                                    size = 26.dp,
+                                    showSoftBackground = false
+                                )
+                                Text(
+                                    text = mood.localizedTitle(lang),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Letter Subject & Content
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(tr("Letter Subject", "Тема письма")) },
+                placeholder = {
+                    Text(
+                        tr(
+                            "e.g., Read this on a quiet autumn morning...",
+                            "Например: Прочитай это в тихий осенний вечер..."
+                        )
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("future_letter_title_input")
+            )
+
+            OutlinedTextField(
+                value = content,
+                onValueChange = { content = it },
+                label = { Text(tr("Your Message to the Future", "Ваше послание в будущее")) },
+                placeholder = {
+                    Text(
+                        tr(
+                            "Dear Future Me,\n\nRight now I am thinking about... Here is what I hope you remember when you open this...",
+                            "Привет, я из будущего!\n\nСейчас я думаю о том, что... Надеюсь, когда ты откроешь это письмо, ты вспомнишь..."
+                        )
+                    )
+                },
+                minLines = 7,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("future_letter_content_input")
+            )
+
+            // 4. Optional Photos (Uploaded to Firebase Storage as WebP)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = tr("Attach Photos (${photoUrls.size}/4)", "Фотографии (${photoUrls.size}/4)"),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (photoUrls.size < 4) {
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isUploadingPhoto,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isUploadingPhoto) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(tr("Uploading...", "Загрузка..."))
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(tr("Add Photo", "Добавить фото"))
+                            }
+                        }
+                    }
+                }
+
+                if (photoUrls.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(photoUrls.size) { index ->
+                            val url = photoUrls[index]
+                            Box(
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                            ) {
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = tr("Attached photo", "Прикрепленное фото"),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                IconButton(
+                                    onClick = {
+                                        photoUrls = photoUrls.toMutableList().also { it.removeAt(index) }
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(28.dp)
+                                        .padding(4.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                            CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = tr("Remove photo", "Удалить фото"),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FutureLetterReaderDialog(
     letter: DiaryEntry,
     onDismiss: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: (String) -> Unit
 ) {
+    val lang = LocalAppLanguage.current
     val mood = letter.botanicalMood()
+    val writtenDate = DateAndPhotoUtils.formatFullDate(letter.writtenDateIso(), lang)
+    val unlockedDate = DateAndPhotoUtils.formatFullDate(letter.dateIso, lang)
+    val unlockTime = letter.unlockTimeHhMm()
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            BotanicalMoodIllustration(mood = mood, size = 56.dp)
-        },
         title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = letter.title.ifBlank { "Письмо из прошлого" },
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BotanicalMoodIllustration(
+                    mood = mood,
+                    size = 44.dp
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Написано ${DateAndPhotoUtils.formatShortRussianDate(letter.writtenDateIso())} • Настроение: ${mood.titleRu}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Center
-                )
+                Column {
+                    Text(
+                        text = letter.title.ifBlank { tr("Letter from the Past", "Письмо из прошлого") },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = tr("Sent on $writtenDate", "Отправлено $writtenDate"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         },
         text = {
@@ -580,62 +1311,51 @@ fun FutureLetterReaderDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                 ) {
-                    Text(
-                        text = letter.content,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(14.dp)
-                    )
-                }
-
-                if (!letter.reflectionAnswer.isNullOrBlank()) {
-                    Surface(
-                        color = mood.softBgColor,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "Моя надежда и цель к этому дню:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = mood.primaryColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = letter.reflectionAnswer,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-
-                if (letter.photosBase64.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        letter.photosBase64.forEach { b64 ->
-                            val bmp = remember(b64) {
-                                DateAndPhotoUtils.decodeBase64ToImageBitmap(b64)
-                            }
-                            if (bmp != null) {
-                                Image(
-                                    bitmap = bmp,
-                                    contentDescription = "Фото из письма",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(110.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                )
-                            }
+                        Icon(
+                            imageVector = Icons.Default.LockOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        val moodLabel = mood.localizedTitle(lang)
+                        Text(
+                            text = tr(
+                                "Unlocked $unlockedDate at $unlockTime • $moodLabel",
+                                "Открыто $unlockedDate в $unlockTime • $moodLabel"
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Text(
+                    text = letter.content,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (letter.photoUrls.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(letter.photoUrls) { url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = tr("Photo from the past", "Фото из прошлого"),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(120.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                            )
                         }
                     }
                 }
@@ -643,466 +1363,129 @@ fun FutureLetterReaderDialog(
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("Закрыть")
+                Text(tr("Close", "Закрыть"))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDelete) {
-                Text("Удалить письмо", color = MaterialTheme.colorScheme.error)
+            TextButton(
+                onClick = {
+                    onDelete(letter.id)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text(tr("Delete", "Удалить"))
             }
         }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun FutureLetterComposerScreen(
-    isSaving: Boolean,
-    onDismiss: () -> Unit,
-    onSaveLetter: (
-        unlockDateIso: String,
-        mood: BotanicalMood,
-        title: String,
-        content: String,
-        hopeOrGoal: String?,
-        photosBase64: List<String>
-    ) -> Unit
+fun SealedLetterBotanicalIllustration(
+    modifier: Modifier = Modifier
 ) {
-    BackHandler { onDismiss() }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val envelopeFill = MaterialTheme.colorScheme.surface
+    val haloStart = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+    val haloEnd = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f)
 
-    val context = LocalContext.current
-    val todayIso = remember { DateAndPhotoUtils.todayIso() }
-    var unlockDateIso by remember {
-        mutableStateOf(DateAndPhotoUtils.shiftMonthsIso(todayIso, 1))
-    }
-    var selectedPreset by remember { mutableIntStateOf(1) } // 1m, 3m, 6m, 12m, 0=custom
-    var selectedMood by remember { mutableStateOf(BotanicalMood.WARM_ROOT) }
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var hopeOrGoal by remember { mutableStateOf("") }
-    var promptIndex by remember { mutableIntStateOf(0) }
-    val photosBase64 = remember { mutableStateListOf<String>() }
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    var validationError by remember { mutableStateOf<String?>(null) }
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h / 2f
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)
-    ) { uris ->
-        uris.forEach { uri ->
-            if (photosBase64.size < 4) {
-                val encoded = DateAndPhotoUtils.compressUriToBase64(context, uri)
-                if (encoded != null) {
-                    photosBase64.add(encoded)
-                }
-            }
-        }
-    }
-
-    if (showDatePickerDialog) {
-        val cal = DateAndPhotoUtils.parseIsoToCalendar(unlockDateIso)
-        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-            set(
-                cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH),
-                cal.get(Calendar.DAY_OF_MONTH),
-                12,
-                0,
-                0
-            )
-        }
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = utcCal.timeInMillis
+        // 1. Soft radial gradient aura
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(haloStart, haloEnd),
+                center = Offset(cx, cy),
+                radius = w * 0.48f
+            ),
+            radius = w * 0.48f,
+            center = Offset(cx, cy)
         )
-        DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            val pickedUtc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-                                timeInMillis = millis
-                            }
-                            unlockDateIso = DateAndPhotoUtils.calendarToIso(pickedUtc)
-                            selectedPreset = 0
-                        }
-                        showDatePickerDialog = false
-                    }
-                ) {
-                    Text("Выбрать")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
+
+        // 2. Decorative botanical leaves emerging behind the envelope
+        val leftLeaf = Path().apply {
+            moveTo(cx - w * 0.18f, cy - h * 0.08f)
+            cubicTo(
+                cx - w * 0.38f, cy - h * 0.28f,
+                cx - w * 0.22f, cy - h * 0.40f,
+                cx - w * 0.06f, cy - h * 0.24f
+            )
+            close()
         }
-    }
+        drawPath(path = leftLeaf, color = primaryColor.copy(alpha = 0.28f))
+        drawPath(
+            path = leftLeaf,
+            color = primaryColor,
+            style = Stroke(width = w * 0.022f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
 
-    val daysFromToday = DateAndPhotoUtils.daysBetween(todayIso, unlockDateIso).coerceAtLeast(0)
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-        ) {
-            // Top bar with zero button overflow
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.testTag("future_letter_close_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад"
-                    )
-                }
-                Text(
-                    text = "Письмо в будущее",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 6.dp)
-                )
-                Button(
-                    onClick = {
-                        if (content.isBlank()) {
-                            validationError = "Напишите текст послания себе в будущее"
-                        } else {
-                            onSaveLetter(
-                                unlockDateIso,
-                                selectedMood,
-                                title.ifBlank { "Письмо себе из ${DateAndPhotoUtils.formatShortRussianDate(todayIso)}" },
-                                content,
-                                hopeOrGoal.takeIf { it.isNotBlank() },
-                                photosBase64.toList()
-                            )
-                        }
-                    },
-                    enabled = !isSaving,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("future_letter_seal_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (isSaving) "..." else "Запечатать", maxLines = 1)
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .widthIn(max = 640.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 1. Unlock Date & Time Capsule Presets
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Outlined.Schedule,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Когда открыть письмо?",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${DateAndPhotoUtils.formatFullRussianDate(unlockDateIso)} (${
-                                        if (daysFromToday <= 0) "откроется сразу"
-                                        else "через $daysFromToday дн."
-                                    })",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            val presets = listOf(
-                                1 to "Через 1 мес.",
-                                3 to "Через 3 мес.",
-                                6 to "Через полгода",
-                                12 to "Через 1 год"
-                            )
-                            presets.forEach { (months, label) ->
-                                FilterChip(
-                                    selected = selectedPreset == months,
-                                    onClick = {
-                                        selectedPreset = months
-                                        unlockDateIso = DateAndPhotoUtils.shiftMonthsIso(todayIso, months)
-                                    },
-                                    label = { Text(label) }
-                                )
-                            }
-                            FilterChip(
-                                selected = selectedPreset == 0,
-                                onClick = { showDatePickerDialog = true },
-                                label = { Text("Выбрать дату") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Filled.CalendarMonth,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // 2. Inspiration prompt card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Lightbulb,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Идея для письма",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            TextButton(
-                                onClick = {
-                                    promptIndex = (promptIndex + 1) % ReflectionPrompts.futureLetterPrompts.size
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Другая", maxLines = 1)
-                            }
-                        }
-                        Text(
-                            text = ReflectionPrompts.futureLetterPrompts[promptIndex],
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                // 3. Letter Title & Body
-                AnimatedVisibility(visible = validationError != null) {
-                    Text(
-                        text = validationError.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = {
-                        title = it
-                        validationError = null
-                    },
-                    label = { Text("Обращение или тема письма") },
-                    placeholder = { Text("Например: Дорогой я из будущего…") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("future_letter_title_input"),
-                    shape = RoundedCornerShape(14.dp)
-                )
-
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = {
-                        content = it
-                        validationError = null
-                    },
-                    label = { Text("Текст вашего письма") },
-                    placeholder = { Text("Напишите то, о чем важно помнить, поддержите себя, расскажите о сегодняшнем дне…") },
-                    minLines = 5,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("future_letter_content_input"),
-                    shape = RoundedCornerShape(14.dp)
-                )
-
-                OutlinedTextField(
-                    value = hopeOrGoal,
-                    onValueChange = { hopeOrGoal = it },
-                    label = { Text("Моя главная надежда или цель к этой дате (по желанию)") },
-                    placeholder = { Text("Например: Обрести больше спокойствия и побывать у моря") },
-                    minLines = 2,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("future_letter_goal_input"),
-                    shape = RoundedCornerShape(14.dp)
-                )
-
-                // 4. Mood when writing the letter
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "С каким чувством вы отправляете письмо?",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    BotanicalMoodSelectorGrid(
-                        selectedMood = selectedMood,
-                        onMoodSelected = { selectedMood = it }
-                    )
-                }
-
-                // 5. Photos for the time capsule
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Вложить фото в конверт (${photosBase64.size}/4)",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            FilledTonalButton(
-                                onClick = {
-                                    photoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
-                                },
-                                enabled = photosBase64.size < 4,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.AddPhotoAlternate,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Добавить", maxLines = 1)
-                            }
-                        }
-
-                        if (photosBase64.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                photosBase64.forEachIndexed { idx, b64 ->
-                                    val bmp = remember(b64) {
-                                        DateAndPhotoUtils.decodeBase64ToImageBitmap(b64)
-                                    }
-                                    Box(modifier = Modifier.size(96.dp)) {
-                                        if (bmp != null) {
-                                            Image(
-                                                bitmap = bmp,
-                                                contentDescription = "Фото в письмо",
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .clip(RoundedCornerShape(12.dp))
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { photosBase64.removeAt(idx) },
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(2.dp)
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .background(Color.Black.copy(alpha = 0.55f))
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Close,
-                                                contentDescription = "Удалить фото",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+        val rightLeaf = Path().apply {
+            moveTo(cx + w * 0.18f, cy - h * 0.08f)
+            cubicTo(
+                cx + w * 0.38f, cy - h * 0.28f,
+                cx + w * 0.22f, cy - h * 0.40f,
+                cx + w * 0.06f, cy - h * 0.24f
+            )
+            close()
         }
+        drawPath(path = rightLeaf, color = secondaryColor.copy(alpha = 0.28f))
+        drawPath(
+            path = rightLeaf,
+            color = secondaryColor,
+            style = Stroke(width = w * 0.022f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+
+        // 3. Envelope body
+        val envWidth = w * 0.62f
+        val envHeight = h * 0.44f
+        val envLeft = cx - envWidth / 2f
+        val envTop = cy - envHeight / 2f + h * 0.05f
+
+        drawRoundRect(
+            color = envelopeFill,
+            topLeft = Offset(envLeft, envTop),
+            size = Size(envWidth, envHeight),
+            cornerRadius = CornerRadius(w * 0.06f, w * 0.06f)
+        )
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(envLeft, envTop),
+            size = Size(envWidth, envHeight),
+            cornerRadius = CornerRadius(w * 0.06f, w * 0.06f),
+            style = Stroke(width = w * 0.026f)
+        )
+
+        // 4. Envelope top flap lines
+        val flapPath = Path().apply {
+            moveTo(envLeft + w * 0.02f, envTop + h * 0.02f)
+            lineTo(cx, cy + h * 0.07f)
+            lineTo(envLeft + envWidth - w * 0.02f, envTop + h * 0.02f)
+        }
+        drawPath(
+            path = flapPath,
+            color = primaryColor,
+            style = Stroke(width = w * 0.024f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+
+        // 5. Wax seal stamp in center of envelope
+        val sealCenter = Offset(cx, cy + h * 0.07f)
+        drawCircle(
+            color = tertiaryColor,
+            radius = w * 0.095f,
+            center = sealCenter
+        )
+        drawCircle(
+            color = envelopeFill,
+            radius = w * 0.072f,
+            center = sealCenter,
+            style = Stroke(width = w * 0.014f)
+        )
     }
 }
+

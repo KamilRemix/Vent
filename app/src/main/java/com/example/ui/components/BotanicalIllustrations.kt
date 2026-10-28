@@ -250,7 +250,7 @@ fun BotanicalMoodSelectorGrid(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = mood.titleRu,
+                            text = mood.localizedTitle(com.example.util.LocalAppLanguage.current),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) Color(0xFF2C2623) else MaterialTheme.colorScheme.onSurface,
@@ -308,3 +308,39 @@ fun BotanicalHeroArtCard(
         }
     }
 }
+
+@Composable
+fun MoodDistributionBar(
+    moodCounts: Map<BotanicalMood, Int>,
+    modifier: Modifier = Modifier
+) {
+    val total = moodCounts.values.sum().coerceAtLeast(1)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(14.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        if (moodCounts.values.sum() == 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        } else {
+            BotanicalMood.entries.forEach { mood ->
+                val count = moodCounts[mood] ?: 0
+                if (count > 0) {
+                    Box(
+                        modifier = Modifier
+                            .weight(count.toFloat() / total.toFloat())
+                            .fillMaxSize()
+                            .background(mood.primaryColor)
+                    )
+                }
+            }
+        }
+    }
+}
+

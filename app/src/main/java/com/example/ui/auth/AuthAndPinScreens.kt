@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Backspace
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material3.AlertDialog
@@ -36,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -54,19 +58,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.example.R
 import com.example.data.model.BotanicalMood
 import com.example.ui.components.BotanicalHeroArtCard
 import com.example.ui.components.BotanicalMoodIllustration
+import com.example.ui.theme.NunitoFontFamily
+import com.example.util.AppLocaleHolder
+import com.example.util.BiometricAuthHelper
+import com.example.util.LocalAppLanguage
+import com.example.util.tr
+import android.content.ContextWrapper
+import android.content.MutableContextWrapper
+import android.util.Base64
+import com.example.util.trText
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -74,80 +88,125 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Co
 import com.google.firebase.Firebase
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.auth
+import java.security.SecureRandom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-fun attemptAutoSignIn(
-    context: Context,
-    credentialManager: CredentialManager,
-    onAuthSuccess: () -> Unit,
-    onUnauthenticated: () -> Unit,
-    scope: CoroutineScope
-) {
-    if (Firebase.auth.currentUser != null) {
-        onAuthSuccess()
-        return
-    }
-    val clientId = try {
-        context.getString(R.string.default_web_client_id)
-    } catch (e: Exception) {
-        onUnauthenticated()
-        return
-    }
-
-    val googleIdOption = GetGoogleIdOption.Builder()
-        .setFilterByAuthorizedAccounts(true)
-        .setServerClientId(clientId)
-        .setAutoSelectEnabled(true)
-        .build()
-
-    val request = GetCredentialRequest.Builder()
-        .addCredentialOption(googleIdOption)
-        .build()
-
-    scope.launch {
-        try {
-            val result = credentialManager.getCredential(context, request)
-            val credential = result.credential
-            if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
-                val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                Firebase.auth.signInWithCredential(authCredential).await()
-                onAuthSuccess()
-            } else {
-                onUnauthenticated()
-            }
-        } catch (e: Exception) {
-            onUnauthenticated()
-        }
-    }
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
-fun onGoogleSignInClicked(
+private fun generateSecureRandomNonce(byteLength: Int = 32): String {
+    val randomBytes = ByteArray(byteLength)
+    SecureRandom().nextBytes(randomBytes)
+    return Base64.encodeToString(
+        randomBytes,
+        Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING
+    )
+}
+
+/**
+ * Triggers the official Android Credential Manager Sign-in bottom sheet (formerly One Tap API)
+ * using Google's recommended two-step `GetGoogleIdOption` flow:
+ * 1. First checks previously authorized accounts (`setFilterByAuthorizedAccounts(true)`, `setAutoSelectEnabled(true)`).
+ * 2. If the user hasn't signed into the app before (`NoCredentialException`), immediately shows the
+ *    Sign-in bottom sheet with all Google accounts on the device (`setFilterByAuthorizedAccounts(false)`),
+ *    where the primary account is pre-selected with an account switcher arrow and "Continue as [Name]".
+ * 3. Only if the bottom sheet is blocked by system cooldown on an explicit button click does it fall back
+ *    to `GetSignInWithGoogleOption`.
+ */
+fun launchOneTapOrGoogleSignIn(
     context: Context,
     credentialManager: CredentialManager,
     onAuthSuccess: () -> Unit,
     onAuthError: (String) -> Unit,
     scope: CoroutineScope,
-    onAuthCancelled: () -> Unit = {}
+    onAuthCancelled: () -> Unit = {},
+    silentIfNoCredential: Boolean = false
 ) {
+    if (Firebase.auth.currentUser != null) {
+        onAuthSuccess()
+        return
+    }
+    val lang = AppLocaleHolder.currentLanguage
     val clientId = try {
         context.getString(R.string.default_web_client_id)
     } catch (e: Exception) {
-        onAuthError("Конфигурация Google Sign-In отсутствует: default_web_client_id не найден")
+        if (!silentIfNoCredential) {
+            onAuthError(
+                trText(
+                    lang,
+                    "Google Sign-In configuration missing: default_web_client_id not found",
+                    "Конфигурация Google Sign-In отсутствует: default_web_client_id не найден"
+                )
+            )
+        } else {
+            onAuthCancelled()
+        }
         return
     }
 
-    val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
-    val request = GetCredentialRequest.Builder()
-        .addCredentialOption(signInOption)
-        .build()
+    val activityContext = context.findActivity()?.let { MutableContextWrapper(it) } ?: context
 
     scope.launch {
         try {
-            val activityContext = context as? Activity ?: context
-            val result = credentialManager.getCredential(activityContext, request)
+            // Step 1: Sign-in bottom sheet for previously authorized accounts (supports Auto Sign-in)
+            val authorizedGoogleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(true)
+                .setServerClientId(clientId)
+                .setAutoSelectEnabled(true)
+                .setNonce(generateSecureRandomNonce())
+                .build()
+
+            val authorizedRequest = GetCredentialRequest.Builder()
+                .addCredentialOption(authorizedGoogleIdOption)
+                .build()
+
+            val result = try {
+                credentialManager.getCredential(
+                    request = authorizedRequest,
+                    context = activityContext
+                )
+            } catch (e: NoCredentialException) {
+                // Step 2: User has not signed in to Vent yet — show Sign-in bottom sheet (One Tap UI)
+                // for all Google accounts on the device (pre-selected account + arrow + "Continue as...")
+                val allAccountsGoogleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(clientId)
+                    .setAutoSelectEnabled(false)
+                    .setNonce(generateSecureRandomNonce())
+                    .build()
+
+                val allAccountsRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(allAccountsGoogleIdOption)
+                    .build()
+
+                try {
+                    credentialManager.getCredential(
+                        request = allAccountsRequest,
+                        context = activityContext
+                    )
+                } catch (innerNoCred: NoCredentialException) {
+                    if (silentIfNoCredential) {
+                        throw innerNoCred
+                    }
+                    // Step 3: Only on explicit button click if One Tap bottom sheet is on Play Services cooldown
+                    val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
+                        serverClientId = clientId
+                    ).setNonce(generateSecureRandomNonce()).build()
+                    val fallbackRequest = GetCredentialRequest.Builder()
+                        .addCredentialOption(signInWithGoogleOption)
+                        .build()
+                    credentialManager.getCredential(
+                        request = fallbackRequest,
+                        context = activityContext
+                    )
+                }
+            }
+
             val credential = result.credential
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -155,14 +214,43 @@ fun onGoogleSignInClicked(
                 Firebase.auth.signInWithCredential(authCredential).await()
                 onAuthSuccess()
             } else {
-                onAuthError("Неожиданный тип учетных данных")
+                onAuthError(
+                    trText(
+                        lang,
+                        "Unexpected credential type received",
+                        "Неожиданный тип учетных данных"
+                    )
+                )
             }
         } catch (e: GetCredentialCancellationException) {
-            Log.w("Auth", "Google Sign-In cancelled or dismissed: ${e.message}", e)
+            Log.w("Auth", "Google Sign-In bottom sheet cancelled or dismissed: ${e.message}")
             onAuthCancelled()
+        } catch (e: NoCredentialException) {
+            Log.w("Auth", "No Google account available for bottom sheet: ${e.message}")
+            if (silentIfNoCredential) {
+                onAuthCancelled()
+            } else {
+                onAuthError(
+                    trText(
+                        lang,
+                        "No Google account found on this device. Please sign in to a Google account in Android Settings.",
+                        "На устройстве не найден аккаунт Google. Добавьте аккаунт Google в настройках Android."
+                    )
+                )
+            }
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Не удалось выполнить вход через Google")
+            if (silentIfNoCredential) {
+                onAuthCancelled()
+            } else {
+                onAuthError(
+                    e.localizedMessage ?: trText(
+                        lang,
+                        "Failed to sign in with Google",
+                        "Не удалось выполнить вход через Google"
+                    )
+                )
+            }
         }
     }
 }
@@ -187,7 +275,8 @@ fun signOutFromGoogle(
 
 @Composable
 fun AuthWelcomeScreen(
-    onAuthSuccess: () -> Unit
+    onAuthSuccess: () -> Unit,
+    onSkipClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -195,14 +284,36 @@ fun AuthWelcomeScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        attemptAutoSignIn(
+    fun triggerGoogleBottomSheet(silentIfNoCredential: Boolean) {
+        if (isLoading) return
+        errorMessage = null
+        isLoading = true
+        launchOneTapOrGoogleSignIn(
             context = context,
             credentialManager = credentialManager,
-            onAuthSuccess = onAuthSuccess,
-            onUnauthenticated = {},
-            scope = scope
+            onAuthSuccess = {
+                isLoading = false
+                onAuthSuccess()
+            },
+            onAuthError = { msg ->
+                isLoading = false
+                errorMessage = msg
+            },
+            scope = scope,
+            onAuthCancelled = {
+                isLoading = false
+            },
+            silentIfNoCredential = silentIfNoCredential
         )
+    }
+
+    // Automatically slide up the native Google Sign-in bottom sheet (One Tap API) when screen opens
+    LaunchedEffect(Unit) {
+        if (Firebase.auth.currentUser != null) {
+            onAuthSuccess()
+        } else {
+            triggerGoogleBottomSheet(silentIfNoCredential = true)
+        }
     }
 
     Surface(
@@ -213,18 +324,18 @@ fun AuthWelcomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 20.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
                     .widthIn(max = 480.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(vertical = 24.dp),
+                    .padding(vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    BotanicalHeroArtCard(height = 180.dp)
+                    BotanicalHeroArtCard(height = 170.dp)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(16.dp)
@@ -233,51 +344,58 @@ fun AuthWelcomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            BotanicalMoodIllustration(mood = BotanicalMood.CALM_LEAF, size = 50.dp)
-                            BotanicalMoodIllustration(mood = BotanicalMood.BLOOM, size = 62.dp)
-                            BotanicalMoodIllustration(mood = BotanicalMood.WARM_ROOT, size = 50.dp)
+                            BotanicalMoodIllustration(mood = BotanicalMood.CALM_LEAF, size = 48.dp)
+                            BotanicalMoodIllustration(mood = BotanicalMood.BLOOM, size = 60.dp)
+                            BotanicalMoodIllustration(mood = BotanicalMood.WARM_ROOT, size = 48.dp)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(22.dp))
 
                 Text(
-                    text = stringResource(R.string.app_name),
+                    text = "Vent",
                     style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = stringResource(R.string.sign_in_welcome_title),
+                    text = tr(
+                        "A Quiet Space for Your Mind",
+                        "Тихое пространство для твоих мыслей"
+                    ),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = stringResource(R.string.sign_in_welcome_body),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = tr(
+                        "Capture daily moments, track your emotional balance, and send sealed letters to your future self with private cloud sync.",
+                        "Сохраняйте важные моменты дня, отслеживайте эмоциональный баланс и отправляйте запечатанные письма себе в будущее с облачной синхронизацией."
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -288,7 +406,10 @@ fun AuthWelcomeScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Красивые авторские иконки эмоций (без шаблонных эмодзи)",
+                                text = tr(
+                                    "Custom minimalist emotion icons — no generic emojis",
+                                    "Авторские минималистичные иконки эмоций без шаблонных эмодзи"
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -301,7 +422,10 @@ fun AuthWelcomeScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Календарь воспоминаний и капсула «В этот день»",
+                                text = tr(
+                                    "Time capsule letters & On This Day retrospectives",
+                                    "Письма себе в будущее и воспоминания «В этот день»"
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -314,7 +438,10 @@ fun AuthWelcomeScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Облачная синхронизация и защита PIN-кодом",
+                                text = tr(
+                                    "Cloud sync & PIN / Fingerprint biometric protection",
+                                    "Облачная синхронизация и защита по PIN / отпечатку пальца"
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -322,7 +449,7 @@ fun AuthWelcomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(22.dp))
 
                 AnimatedVisibility(visible = errorMessage != null) {
                     Text(
@@ -335,49 +462,65 @@ fun AuthWelcomeScreen(
                 }
 
                 Button(
-                    onClick = {
-                        errorMessage = null
-                        isLoading = true
-                        onGoogleSignInClicked(
-                            context = context,
-                            credentialManager = credentialManager,
-                            onAuthSuccess = {
-                                isLoading = false
-                                onAuthSuccess()
-                            },
-                            onAuthError = { msg ->
-                                isLoading = false
-                                errorMessage = msg
-                            },
-                            scope = scope,
-                            onAuthCancelled = {
-                                isLoading = false
-                            }
-                        )
-                    },
+                    onClick = { triggerGoogleBottomSheet(silentIfNoCredential = false) },
                     enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(54.dp)
                         .testTag("google_sign_in_button"),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
                             color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.5.dp
                         )
-                    } else {
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = stringResource(R.string.sign_in_google),
+                            text = tr("Opening Google Sign-In...", "Открываем вход Google..."),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            maxLines = 1
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = tr("Continue with Google", "Войти через Google"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            maxLines = 1
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                TextButton(
+                    onClick = onSkipClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("skip_auth_button")
+                ) {
+                    Text(
+                        text = tr(
+                            "Skip for now (Sign in later in Settings)",
+                            "Пропустить (можно войти позже в Настройках)"
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -386,11 +529,30 @@ fun AuthWelcomeScreen(
 
 @Composable
 fun BotanicalPinLockScreen(
+    isBiometricEnabled: Boolean = true,
     onVerifyPin: (String) -> Boolean,
     onUnlocked: () -> Unit
 ) {
+    val context = LocalContext.current
+    val lang = LocalAppLanguage.current
     var enteredPin by remember { mutableStateOf("") }
     var hasError by remember { mutableStateOf(false) }
+
+    val biometricSupported = remember(context) {
+        BiometricAuthHelper.isBiometricAvailable(context)
+    }
+    val canUseBiometric = biometricSupported && isBiometricEnabled
+
+    // Automatically pop up the system Android Fingerprint sheet when the lock screen opens
+    LaunchedEffect(canUseBiometric) {
+        if (canUseBiometric) {
+            BiometricAuthHelper.authenticate(
+                context = context,
+                lang = lang,
+                onSuccess = onUnlocked
+            )
+        }
+    }
 
     fun onDigitTap(digit: String) {
         if (enteredPin.length < 4) {
@@ -423,22 +585,30 @@ fun BotanicalPinLockScreen(
             BotanicalMoodIllustration(mood = BotanicalMood.CALM_LEAF, size = 72.dp)
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = stringResource(R.string.pin_unlock_title),
+                text = tr("Journal Locked", "Дневник защищен"),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = if (hasError) "Неверный PIN-код. Попробуйте еще раз"
-                else stringResource(R.string.pin_unlock_subtitle),
+                text = if (hasError) {
+                    tr("Incorrect PIN code. Please try again", "Неверный PIN-код. Попробуйте еще раз")
+                } else if (canUseBiometric) {
+                    tr(
+                        "Enter 4-digit PIN or use fingerprint",
+                        "Введите 4-значный PIN или используйте отпечаток пальца"
+                    )
+                } else {
+                    tr("Enter your 4-digit PIN code to unlock", "Введите 4-значный PIN-код для входа")
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (hasError) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // 4 Botanical seed indicators
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -462,13 +632,13 @@ fun BotanicalPinLockScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             val rows = listOf(
                 listOf("1", "2", "3"),
                 listOf("4", "5", "6"),
                 listOf("7", "8", "9"),
-                listOf("", "0", "DEL")
+                listOf(if (canUseBiometric) "BIO" else "", "0", "DEL")
             )
             Column(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -482,6 +652,33 @@ fun BotanicalPinLockScreen(
                         row.forEach { key ->
                             when (key) {
                                 "" -> Spacer(modifier = Modifier.size(68.dp))
+                                "BIO" -> Box(
+                                    modifier = Modifier
+                                        .size(68.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                            CircleShape
+                                        )
+                                        .clickable {
+                                            BiometricAuthHelper.authenticate(
+                                                context = context,
+                                                lang = lang,
+                                                onSuccess = onUnlocked
+                                            )
+                                        }
+                                        .testTag("pin_key_biometric"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fingerprint,
+                                        contentDescription = tr("Fingerprint", "Отпечаток пальца"),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(30.dp)
+                                    )
+                                }
                                 "DEL" -> Box(
                                     modifier = Modifier
                                         .size(68.dp)
@@ -496,7 +693,7 @@ fun BotanicalPinLockScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.Backspace,
-                                        contentDescription = "Удалить символ",
+                                        contentDescription = tr("Backspace", "Удалить"),
                                         tint = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -516,13 +713,45 @@ fun BotanicalPinLockScreen(
                                 ) {
                                     Text(
                                         text = key,
-                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontFamily = NunitoFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 24.sp,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
                         }
                     }
+                }
+            }
+
+            if (canUseBiometric) {
+                Spacer(modifier = Modifier.height(20.dp))
+                FilledTonalButton(
+                    onClick = {
+                        BiometricAuthHelper.authenticate(
+                            context = context,
+                            lang = lang,
+                            onSuccess = onUnlocked
+                        )
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.testTag("biometric_unlock_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        tr(
+                            "Unlock with Fingerprint",
+                            "Войти по отпечатку пальца"
+                        ),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -538,6 +767,7 @@ fun PinSetupDialog(
 ) {
     var pinInput by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val enterFourDigitsMsg = tr("Please enter exactly 4 digits", "Введите ровно 4 цифры")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -550,14 +780,21 @@ fun PinSetupDialog(
         },
         title = {
             Text(
-                text = if (isPinCurrentlyEnabled) "Управление PIN-кодом" else "Установить PIN-код",
+                text = if (isPinCurrentlyEnabled) {
+                    tr("Manage PIN Lock", "Настройка PIN-кода")
+                } else {
+                    tr("Set Up PIN Lock", "Установить PIN-код")
+                },
                 style = MaterialTheme.typography.headlineSmall
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Защитите свои личные психологические записи 4-значным PIN-кодом при открытии приложения.",
+                    text = tr(
+                        "Protect your personal journal entries with a 4-digit PIN code and fingerprint biometrics.",
+                        "Защитите личные записи дневника 4-значным PIN-кодом и входом по отпечатку пальца."
+                    ),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 OutlinedTextField(
@@ -568,7 +805,7 @@ fun PinSetupDialog(
                             errorText = null
                         }
                     },
-                    label = { Text("4 цифры PIN-кода") },
+                    label = { Text(tr("4-digit PIN code", "4-значный PIN-код")) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -590,12 +827,12 @@ fun PinSetupDialog(
                         onSavePin(pinInput)
                         onDismiss()
                     } else {
-                        errorText = "Введите ровно 4 цифры"
+                        errorText = enterFourDigitsMsg
                     }
                 },
                 modifier = Modifier.testTag("save_pin_button")
             ) {
-                Text("Сохранить PIN")
+                Text(tr("Save PIN", "Сохранить PIN"), maxLines = 1)
             }
         },
         dismissButton = {
@@ -608,11 +845,15 @@ fun PinSetupDialog(
                         },
                         modifier = Modifier.testTag("disable_pin_button")
                     ) {
-                        Text("Отключить", color = MaterialTheme.colorScheme.error)
+                        Text(
+                            text = tr("Disable", "Отключить"),
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1
+                        )
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Отмена")
+                    Text(tr("Cancel", "Отмена"), maxLines = 1)
                 }
             }
         }

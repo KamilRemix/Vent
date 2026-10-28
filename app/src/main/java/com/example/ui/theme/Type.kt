@@ -54,7 +54,7 @@ val Typography = Typography(
         lineHeight = 28.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = CormorantFontFamily,
+        fontFamily = NunitoFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp

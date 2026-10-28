@@ -1,12 +1,24 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.ai.AiAnalysisUiState
+import com.example.data.ai.AiPsychologicalReport
+import com.example.data.ai.AnalysisPeriodType
+import com.example.data.ai.AvailableAnalysisPeriod
+import com.example.data.ai.PeriodInsightDetector
+import com.example.data.ai.PsychologicalAiAnalyzer
 import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
 import com.example.data.repository.DiaryRepository
+import com.example.data.repository.PhotoStorageRepository
+import com.example.notifications.LetterUnlockScheduler
+import com.example.util.AppLocaleHolder
 import com.example.util.DateAndPhotoUtils
+import com.example.util.trText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.UUID
 
 sealed interface UiState<out T> {
     data object Loading : UiState<Nothing>
@@ -36,7 +49,9 @@ data class MoodAnalyticsData(
 
 class DiaryViewModel(
     private val repository: DiaryRepository,
-    private val currentUserId: String
+    private val currentUserId: String,
+    private val photoStorageRepository: PhotoStorageRepository = PhotoStorageRepository(),
+    private val aiAnalyzer: PsychologicalAiAnalyzer? = null
 ) : ViewModel() {
 
     private val _selectedDateIso = MutableStateFlow(DateAndPhotoUtils.todayIso())
@@ -64,13 +79,57 @@ class DiaryViewModel(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    private val _isUploadingPhoto = MutableStateFlow(false)
+    val isUploadingPhoto: StateFlow<Boolean> = _isUploadingPhoto.asStateFlow()
+
+    // Psychological AI Insights State
+    private val initialYearMonth = String.format(
+        "%04d-%02d",
+        initialCal.get(Calendar.YEAR),
+        initialCal.get(Calendar.MONTH) + 1
+    )
+    private val _selectedAiCategory = MutableStateFlow(
+        if (initialCal.get(Calendar.MONTH) == Calendar.DECEMBER) {
+            AnalysisPeriodType.YEARLY_REVIEW
+        } else {
+            AnalysisPeriodType.MONTHLY
+        }
+    )
+    val selectedAiCategory: StateFlow<AnalysisPeriodType> = _selectedAiCategory.asStateFlow()
+
+    private val _selectedAiPeriodKey = MutableStateFlow(
+        if (initialCal.get(Calendar.MONTH) == Calendar.DECEMBER) {
+            "${initialCal.get(Calendar.YEAR)}-YEAR"
+        } else {
+            initialYearMonth
+        }
+    )
+    val selectedAiPeriodKey: StateFlow<String> = _selectedAiPeriodKey.asStateFlow()
+
+    private val _savedAiReports = MutableStateFlow<Map<String, AiPsychologicalReport>>(
+        aiAnalyzer?.loadSavedReports(currentUserId).orEmpty()
+    )
+    val savedAiReports: StateFlow<Map<String, AiPsychologicalReport>> = _savedAiReports.asStateFlow()
+
+    private val _aiAnalysisUiState = MutableStateFlow<AiAnalysisUiState>(AiAnalysisUiState.Idle)
+    val aiAnalysisUiState: StateFlow<AiAnalysisUiState> = _aiAnalysisUiState.asStateFlow()
+
     // Two-Tier Kotlin Flow Error Handling Architecture
     private val allUserDocumentsState: StateFlow<UiState<List<DiaryEntry>>> = repository
         .observeEntries(currentUserId)
         .map<List<DiaryEntry>, UiState<List<DiaryEntry>>> { UiState.Success(it) }
         .catch { error ->
             Log.w(TAG, "Error observing diary entries", error)
-            emit(UiState.Error(error.localizedMessage ?: "Не удалось загрузить записи дневника"))
+            val lang = AppLocaleHolder.currentLanguage
+            emit(
+                UiState.Error(
+                    error.localizedMessage ?: trText(
+                        lang,
+                        "Failed to load journal entries",
+                        "Не удалось загрузить записи дневника"
+                    )
+                )
+            )
         }
         .stateIn(
             scope = viewModelScope,
@@ -218,6 +277,28 @@ class DiaryViewModel(
         _statusBannerMessage.value = null
     }
 
+    fun uploadPhotoAsWebp(
+        context: Context,
+        uri: Uri,
+        onUploaded: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val lang = AppLocaleHolder.currentLanguage
+            _isUploadingPhoto.value = true
+            val result = photoStorageRepository.compressAndUploadWebpPhoto(context, uri)
+            _isUploadingPhoto.value = false
+            result.onSuccess { downloadUrl ->
+                onUploaded(downloadUrl)
+            }.onFailure { err ->
+                _statusBannerMessage.value = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to upload WebP photo",
+                    "Не удалось загрузить фото (WebP)"
+                )
+            }
+        }
+    }
+
     fun saveDiaryEntry(
         existingEntryId: String?,
         dateIso: String,
@@ -228,10 +309,11 @@ class DiaryViewModel(
         reflectionPrompt: String?,
         reflectionAnswer: String?,
         tags: List<String>,
-        photosBase64: List<String>,
+        photoUrls: List<String>,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
+            val lang = AppLocaleHolder.currentLanguage
             _isSaving.value = true
             val isExisting = !existingEntryId.isNullOrBlank()
             val result = repository.saveEntry(
@@ -244,104 +326,212 @@ class DiaryViewModel(
                 reflectionPrompt = reflectionPrompt,
                 reflectionAnswer = reflectionAnswer,
                 tags = tags,
-                photosBase64 = photosBase64,
+                photoUrls = photoUrls,
                 isExistingDocument = isExisting
             )
             _isSaving.value = false
             result.onSuccess {
                 _selectedDateIso.value = dateIso
-                _statusBannerMessage.value = "Запись за ${DateAndPhotoUtils.formatShortRussianDate(dateIso)} сохранена"
+                val formatted = DateAndPhotoUtils.formatShortDate(dateIso, lang)
+                _statusBannerMessage.value = trText(
+                    lang,
+                    "Entry for $formatted saved",
+                    "Запись за $formatted сохранена"
+                )
                 onSaved()
             }.onFailure { err ->
-                _statusBannerMessage.value = err.localizedMessage ?: "Ошибка сохранения записи"
+                _statusBannerMessage.value = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to save entry",
+                    "Не удалось сохранить запись"
+                )
             }
         }
     }
 
-    fun deleteDiaryEntry(entryId: String, onDeleted: () -> Unit = {}) {
+    fun deleteDiaryEntry(context: Context? = null, entryId: String, onDeleted: () -> Unit = {}) {
         viewModelScope.launch {
+            val lang = AppLocaleHolder.currentLanguage
             val result = repository.deleteEntry(entryId)
             result.onSuccess {
-                _statusBannerMessage.value = "Запись удалена"
+                if (context != null) {
+                    LetterUnlockScheduler.cancelUnlockNotification(context, entryId)
+                }
+                _statusBannerMessage.value = trText(lang, "Entry deleted", "Запись удалена")
                 onDeleted()
             }.onFailure { err ->
-                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось удалить запись"
+                _statusBannerMessage.value = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to delete entry",
+                    "Не удалось удалить запись"
+                )
             }
         }
     }
 
     fun clearAllEntries() {
         viewModelScope.launch {
+            val lang = AppLocaleHolder.currentLanguage
             _isSaving.value = true
             val res = repository.deleteAllEntries()
             _isSaving.value = false
             res.onSuccess {
-                _statusBannerMessage.value = "Все записи очищены"
+                _statusBannerMessage.value = trText(
+                    lang,
+                    "All journal entries cleared",
+                    "Все записи дневника очищены"
+                )
             }.onFailure { err ->
-                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось очистить записи"
+                _statusBannerMessage.value = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to clear entries",
+                    "Не удалось очистить записи"
+                )
             }
         }
     }
 
     fun saveFutureLetter(
+        context: Context,
         unlockDateIso: String,
+        unlockHour: Int,
+        unlockMinute: Int,
         mood: BotanicalMood,
         title: String,
         content: String,
         hopeOrGoal: String?,
-        photosBase64: List<String>,
+        photoUrls: List<String>,
         onSaved: () -> Unit = {}
     ) {
         viewModelScope.launch {
+            val lang = AppLocaleHolder.currentLanguage
             _isSaving.value = true
             val writtenToday = DateAndPhotoUtils.todayIso()
-            val capsuleId = "capsule_${unlockDateIso}_${java.util.UUID.randomUUID().toString().take(6)}"
+            val capsuleId = "capsule_${unlockDateIso}_${UUID.randomUUID().toString().take(6)}"
+            val defaultSubject = trText(lang, "Letter to Future Self", "Письмо себе в будущее")
+            val metadata = DiaryEntry.buildFutureLetterMetadata(
+                writtenDateIso = writtenToday,
+                hour = unlockHour,
+                minute = unlockMinute
+            )
             val result = repository.saveEntry(
                 entryId = capsuleId,
                 dateIso = unlockDateIso,
                 mood = mood,
                 moodIntensity = mood.defaultIntensity,
-                title = title.trim().ifBlank { "Письмо себе в будущее" },
+                title = title.trim().ifBlank { defaultSubject },
                 content = content.trim(),
-                reflectionPrompt = "WRITTEN_AT:$writtenToday",
+                reflectionPrompt = metadata,
                 reflectionAnswer = hopeOrGoal?.trim()?.takeIf { it.isNotBlank() },
-                tags = listOf("письмо_в_будущее"),
-                photosBase64 = photosBase64,
+                tags = listOf("future_letter"),
+                photoUrls = photoUrls,
                 isExistingDocument = false
             )
             _isSaving.value = false
             result.onSuccess {
-                _statusBannerMessage.value = "Письмо запечатано до ${DateAndPhotoUtils.formatShortRussianDate(unlockDateIso)}"
+                LetterUnlockScheduler.scheduleUnlockNotification(
+                    context = context,
+                    letterId = capsuleId,
+                    unlockDateIso = unlockDateIso,
+                    writtenDateIso = writtenToday,
+                    unlockHourOfDay = unlockHour,
+                    unlockMinute = unlockMinute,
+                    replaceExisting = true
+                )
+                val formattedDate = DateAndPhotoUtils.formatShortDate(unlockDateIso, lang)
+                val formattedTime = DateAndPhotoUtils.formatTimeHhMm(unlockHour, unlockMinute)
+                _statusBannerMessage.value = trText(
+                    lang,
+                    "Letter sealed until $formattedDate at $formattedTime",
+                    "Письмо запечатано до $formattedDate в $formattedTime"
+                )
                 onSaved()
             }.onFailure { err ->
-                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось сохранить письмо"
+                _statusBannerMessage.value = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to seal letter",
+                    "Не удалось запечатать письмо"
+                )
             }
         }
     }
 
-    fun unlockLetterEarly(letter: DiaryEntry) {
-        if (letter.id.isBlank()) return
+    fun selectAiCategory(category: AnalysisPeriodType, allEntries: List<DiaryEntry>) {
+        _selectedAiCategory.value = category
+        val periods = PeriodInsightDetector.buildAvailablePeriods(allEntries)
+        val firstMatch = periods.firstOrNull { it.periodType == category && it.entriesCount > 0 }
+            ?: periods.firstOrNull { it.periodType == category }
+        if (firstMatch != null) {
+            _selectedAiPeriodKey.value = firstMatch.periodKey
+        }
+        if (_aiAnalysisUiState.value !is AiAnalysisUiState.Generating) {
+            _aiAnalysisUiState.value = AiAnalysisUiState.Idle
+        }
+    }
+
+    fun selectAiPeriodKey(periodKey: String, allEntries: List<DiaryEntry>) {
+        _selectedAiPeriodKey.value = periodKey
+        val periods = PeriodInsightDetector.buildAvailablePeriods(allEntries)
+        periods.firstOrNull { it.periodKey == periodKey }?.let { matched ->
+            _selectedAiCategory.value = matched.periodType
+        }
+        if (_aiAnalysisUiState.value !is AiAnalysisUiState.Generating) {
+            _aiAnalysisUiState.value = AiAnalysisUiState.Idle
+        }
+    }
+
+    fun generateAiPsychologicalReport(
+        context: Context,
+        period: AvailableAnalysisPeriod,
+        allEntries: List<DiaryEntry>
+    ) {
         viewModelScope.launch {
-            _isSaving.value = true
-            val today = DateAndPhotoUtils.todayIso()
-            val result = repository.saveEntry(
-                entryId = letter.id,
-                dateIso = today,
-                mood = letter.botanicalMood(),
-                moodIntensity = letter.moodIntensity,
-                title = letter.title,
-                content = letter.content,
-                reflectionPrompt = letter.reflectionPrompt ?: "WRITTEN_AT:${letter.writtenDateIso()}",
-                reflectionAnswer = letter.reflectionAnswer,
-                tags = letter.tags,
-                photosBase64 = letter.photosBase64,
-                isExistingDocument = true
+            val lang = AppLocaleHolder.currentLanguage
+            val analyzer = aiAnalyzer ?: PsychologicalAiAnalyzer(context)
+            val periodTitle = period.localizedTitle(lang)
+            _selectedAiPeriodKey.value = period.periodKey
+            _selectedAiCategory.value = period.periodType
+            _aiAnalysisUiState.value = AiAnalysisUiState.Generating(
+                periodTitle = periodTitle,
+                progressPercent = 8,
+                stageTitle = trText(lang, "Starting analysis...", "Запуск психологического разбора..."),
+                stageDetail = trText(lang, "Preparing journal context for $periodTitle...", "Подготавливаем записи за период «$periodTitle»...")
             )
-            _isSaving.value = false
-            result.onSuccess {
-                _statusBannerMessage.value = "Печать снята — письмо открыто"
+
+            val periodEntries = PeriodInsightDetector.entriesForPeriod(allEntries, period.periodKey)
+            val result = analyzer.analyzePeriod(
+                userId = currentUserId,
+                period = period,
+                periodEntries = periodEntries,
+                allEntries = allEntries,
+                lang = lang,
+                onProgress = { percent, stageTitle, stageDetail ->
+                    _aiAnalysisUiState.value = AiAnalysisUiState.Generating(
+                        periodTitle = periodTitle,
+                        progressPercent = percent,
+                        stageTitle = stageTitle,
+                        stageDetail = stageDetail
+                    )
+                }
+            )
+
+            result.onSuccess { report ->
+                val updatedMap = analyzer.loadSavedReports(currentUserId).toMutableMap()
+                updatedMap[report.periodKey] = report
+                _savedAiReports.value = updatedMap
+                _aiAnalysisUiState.value = AiAnalysisUiState.Success(report)
+                _statusBannerMessage.value = trText(
+                    lang,
+                    "Psychological report for $periodTitle is ready",
+                    "Психологический разбор за $periodTitle готов"
+                )
             }.onFailure { err ->
-                _statusBannerMessage.value = err.localizedMessage ?: "Не удалось открыть письмо"
+                val message = err.localizedMessage ?: trText(
+                    lang,
+                    "Failed to generate psychological analysis",
+                    "Не удалось выполнить психологический разбор"
+                )
+                _aiAnalysisUiState.value = AiAnalysisUiState.Error(message)
             }
         }
     }

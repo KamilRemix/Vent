@@ -31,7 +31,7 @@ class DiaryRepositoryRuleTest : FirestoreEmulatorTestBase() {
                 reflectionPrompt = "Что сегодня дало мне ощущение опоры?",
                 reflectionAnswer = "Спокойная прогулка",
                 tags = listOf("природа", "уют"),
-                photosBase64 = emptyList(),
+                photoUrls = emptyList(),
                 isExistingDocument = false
             )
         }
@@ -60,7 +60,7 @@ class DiaryRepositoryRuleTest : FirestoreEmulatorTestBase() {
                 reflectionPrompt = null,
                 reflectionAnswer = null,
                 tags = listOf("тишина"),
-                photosBase64 = emptyList(),
+                photoUrls = emptyList(),
                 isExistingDocument = false
             )
         }

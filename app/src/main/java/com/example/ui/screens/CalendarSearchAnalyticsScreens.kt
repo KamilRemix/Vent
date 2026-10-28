@@ -1,279 +1,183 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.Canvas
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.AutoGraph
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.R
+import androidx.compose.ui.unit.sp
+import com.example.data.ai.AiAnalysisUiState
+import com.example.data.ai.AiPsychologicalReport
+import com.example.data.ai.AnalysisPeriodType
+import com.example.data.ai.AvailableAnalysisPeriod
+import com.example.data.ai.PeriodInsightDetector
 import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
 import com.example.ui.components.BotanicalMoodIllustration
-import com.example.ui.viewmodel.MoodAnalyticsData
+import com.example.ui.components.MoodDistributionBar
+import com.example.ui.theme.NunitoFontFamily
+import com.example.util.AppLanguage
+import com.example.util.AppLanguageMode
 import com.example.util.DateAndPhotoUtils
+import com.example.util.LocalAppLanguage
+import com.example.util.tr
 
 @Composable
 fun CalendarTab(
     entries: List<DiaryEntry>,
+    selectedDateIso: String,
     calendarYear: Int,
     calendarMonthZeroBased: Int,
-    selectedDateIso: String,
     onSelectDate: (String) -> Unit,
-    onNavigateMonth: (Int) -> Unit,
-    onNavigateYear: (Int) -> Unit,
-    onJumpToToday: () -> Unit,
-    onOpenNewEntryForDate: (String) -> Unit,
-    onEditEntry: (DiaryEntry) -> Unit,
-    onTagClicked: (String) -> Unit
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onCreateEntryForDate: (String) -> Unit,
+    onViewEntry: (DiaryEntry) -> Unit
 ) {
-    val cells = remember(calendarYear, calendarMonthZeroBased) {
+    val lang = LocalAppLanguage.current
+    val entriesByDate = remember(entries) { entries.groupBy { it.dateIso } }
+    val selectedDateEntries = entriesByDate[selectedDateIso] ?: emptyList()
+    val monthGridCells = remember(calendarYear, calendarMonthZeroBased) {
         DateAndPhotoUtils.buildMonthGrid(calendarYear, calendarMonthZeroBased)
-    }
-
-    val entriesByDate = remember(entries) {
-        entries.groupBy { it.dateIso }
-    }
-
-    val selectedDayEntries = entriesByDate[selectedDateIso].orEmpty()
-    val selectedMonthDay = if (selectedDateIso.length >= 10) selectedDateIso.substring(5, 10) else ""
-    val selectedYearPrefix = selectedDateIso.take(4)
-    val sameDayOtherYears = remember(entries, selectedMonthDay, selectedYearPrefix) {
-        entries.filter {
-            it.monthDay == selectedMonthDay && !it.dateIso.startsWith(selectedYearPrefix)
-        }
     }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("calendar_lazy_column"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("calendar_tab_list"),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item {
-            Column {
-                Text(
-                    text = "Календарь записей",
-                    style = MaterialTheme.typography.headlineMedium
-                )
-                Text(
-                    text = "Выберите день для просмотра или создания записи",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // Year & Month Navigation + Calendar Grid Card
+        // 1. Month Header Card + Mood Calendar Grid
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Month switcher row (never overflows!)
+                    // Month Switcher
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { onNavigateMonth(-1) },
-                            modifier = Modifier.testTag("calendar_prev_month_btn")
+                            onClick = onPreviousMonth,
+                            modifier = Modifier.testTag("calendar_prev_month")
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                contentDescription = "Предыдущий месяц"
+                                contentDescription = tr("Previous month", "Предыдущий месяц")
                             )
                         }
-                        Text(
-                            text = DateAndPhotoUtils.formatMonthYearHeader(
-                                calendarYear,
-                                calendarMonthZeroBased
-                            ),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = DateAndPhotoUtils.formatMonthYearHeader(
+                                    calendarYear,
+                                    calendarMonthZeroBased,
+                                    lang
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = tr("Mood Calendar", "Календарь настроений"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
                         IconButton(
-                            onClick = { onNavigateMonth(1) },
-                            modifier = Modifier.testTag("calendar_next_month_btn")
+                            onClick = onNextMonth,
+                            modifier = Modifier.testTag("calendar_next_month")
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Следующий месяц"
+                                contentDescription = tr("Next month", "Следующий месяц")
                             )
                         }
                     }
 
-                    // Compact Year Jumpers row (fits comfortably on all screen widths)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AssistChip(
-                            onClick = { onNavigateYear(-1) },
-                            label = { Text("← ${calendarYear - 1}") },
-                            modifier = Modifier.testTag("calendar_prev_year_chip")
-                        )
-                        AssistChip(
-                            onClick = onJumpToToday,
-                            label = { Text("Сегодня") },
-                            modifier = Modifier.testTag("calendar_today_chip")
-                        )
-                        AssistChip(
-                            onClick = { onNavigateYear(1) },
-                            label = { Text("${calendarYear + 1} →") },
-                            modifier = Modifier.testTag("calendar_next_year_chip")
-                        )
+                    // Weekday Headers (Mon - Sun / Пн - Вс)
+                    val weekdays = if (lang == AppLanguage.RU) {
+                        listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+                    } else {
+                        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                     }
-
-                    // Day of week headers
-                    val weekHeaders = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        weekHeaders.forEach { dayName ->
+                        weekdays.forEach { dayName ->
                             Text(
                                 text = dayName,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
 
-                    // 6-row Month Grid
-                    cells.chunked(7).forEach { weekRow ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            weekRow.forEach { cell ->
-                                val dayEntries = entriesByDate[cell.dateIso].orEmpty()
-                                val primaryMood = dayEntries.firstOrNull()?.botanicalMood()
-                                val isSelected = cell.dateIso == selectedDateIso
+                    // Days Grid
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        monthGridCells.chunked(7).forEach { weekCells ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                weekCells.forEach { cell ->
+                                    if (cell.isCurrentMonth) {
+                                        val dayEntries = entriesByDate[cell.dateIso] ?: emptyList()
+                                        val primaryMood = dayEntries.firstOrNull()?.botanicalMood()
+                                        val isSelected = cell.dateIso == selectedDateIso
 
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(0.95f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            when {
-                                                isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                                primaryMood != null -> primaryMood.softBgColor
-                                                else -> Color.Transparent
-                                            }
+                                        CalendarDayItemCell(
+                                            dayNumber = cell.dayOfMonth,
+                                            mood = primaryMood,
+                                            isSelected = isSelected,
+                                            isToday = cell.isToday,
+                                            onClick = { onSelectDate(cell.dateIso) },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(1f)
+                                                .testTag("calendar_day_${cell.dateIso}")
                                         )
-                                        .border(
-                                            width = when {
-                                                isSelected -> 2.dp
-                                                cell.isToday -> 1.5.dp
-                                                else -> 0.dp
-                                            },
-                                            color = when {
-                                                isSelected -> MaterialTheme.colorScheme.primary
-                                                cell.isToday -> MaterialTheme.colorScheme.secondary
-                                                else -> Color.Transparent
-                                            },
-                                            shape = RoundedCornerShape(12.dp)
+                                    } else {
+                                        Spacer(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(1f)
                                         )
-                                        .clickable { onSelectDate(cell.dateIso) }
-                                        .testTag("calendar_cell_${cell.dateIso}"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = cell.dayOfMonth.toString(),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isSelected || primaryMood != null) FontWeight.Bold else FontWeight.Normal,
-                                            color = when {
-                                                !cell.isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                                                primaryMood != null -> Color(0xFF2C2623)
-                                                else -> MaterialTheme.colorScheme.onSurface
-                                            }
-                                        )
-                                        if (primaryMood != null) {
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            BotanicalMoodIllustration(
-                                                mood = primaryMood,
-                                                size = 18.dp,
-                                                showSoftBackground = false
-                                            )
-                                        }
                                     }
                                 }
                             }
@@ -283,72 +187,126 @@ fun CalendarTab(
             }
         }
 
-        // Selected Date Card (clean column layout, button never cut off!)
+        // 2. Selected Date Details & Single Action Button (No overlapping FAB!)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                )
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = DateAndPhotoUtils.formatFullRussianDate(selectedDateIso),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (selectedDayEntries.isEmpty())
-                            "На этот день пока нет записей"
-                        else
-                            "Записей за этот день: ${selectedDayEntries.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = DateAndPhotoUtils.formatFullDate(selectedDateIso, lang),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (selectedDateEntries.isEmpty()) {
+                                tr("No entries for this day", "За этот день нет записей")
+                            } else {
+                                tr(
+                                    "${selectedDateEntries.size} ${if (selectedDateEntries.size == 1) "entry" else "entries"} — tap below to read",
+                                    "Записей: ${selectedDateEntries.size} — нажмите ниже, чтобы прочитать"
+                                )
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     Button(
-                        onClick = { onOpenNewEntryForDate(selectedDateIso) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("calendar_write_for_date_button")
+                        onClick = { onCreateEntryForDate(selectedDateIso) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("calendar_add_entry_button")
                     ) {
-                        Icon(imageVector = Icons.Filled.Add, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Записать за этот день")
+                        Text(tr("Write Entry", "Написать"))
                     }
                 }
             }
         }
 
-        items(selectedDayEntries, key = { it.id.ifBlank { it.dateIso } }) { entry ->
+        items(selectedDateEntries, key = { "cal_${it.id}" }) { entry ->
             DiaryEntryCard(
                 entry = entry,
-                onClick = { onEditEntry(entry) },
-                onTagClicked = onTagClicked
+                onClick = { onViewEntry(entry) }
             )
         }
+    }
+}
 
-        if (sameDayOtherYears.isNotEmpty()) {
-            item {
+@Composable
+private fun CalendarDayItemCell(
+    dayNumber: Int,
+    mood: BotanicalMood?,
+    isSelected: Boolean,
+    isToday: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = when {
+        mood != null -> mood.softBgColor
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        else -> Color.Transparent
+    }
+    val borderColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary
+        isToday -> MaterialTheme.colorScheme.secondary
+        mood != null -> mood.primaryColor.copy(alpha = 0.45f)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
+            .border(
+                width = if (isSelected || isToday) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (mood != null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                BotanicalMoodIllustration(
+                    mood = mood,
+                    size = 20.dp,
+                    showSoftBackground = false
+                )
                 Text(
-                    text = "В этот же день (${selectedMonthDay}) в другие годы:",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = dayNumber.toString(),
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            items(sameDayOtherYears, key = { "other_year_${it.id}" }) { entry ->
-                DiaryEntryCard(
-                    entry = entry,
-                    onClick = { onEditEntry(entry) },
-                    onTagClicked = onTagClicked
-                )
-            }
+        } else {
+            Text(
+                text = dayNumber.toString(),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -356,51 +314,52 @@ fun CalendarTab(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchAndTagsTab(
-    allEntries: List<DiaryEntry>,
     filteredEntries: List<DiaryEntry>,
+    allTags: List<String>,
     searchQuery: String,
-    selectedTag: String?,
-    selectedMood: BotanicalMood?,
-    onSearchQueryChanged: (String) -> Unit,
-    onToggleTag: (String?) -> Unit,
-    onToggleMood: (BotanicalMood?) -> Unit,
-    onEditEntry: (DiaryEntry) -> Unit
+    selectedMoodFilter: BotanicalMood?,
+    selectedTagFilter: String?,
+    onSearchQueryChange: (String) -> Unit,
+    onMoodFilterChange: (BotanicalMood?) -> Unit,
+    onTagFilterChange: (String?) -> Unit,
+    onClearFilters: () -> Unit,
+    onViewEntry: (DiaryEntry) -> Unit
 ) {
-    val allAvailableTags = remember(allEntries) {
-        allEntries.flatMap { it.tags }.distinct().sorted()
-    }
+    val lang = LocalAppLanguage.current
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("search_lazy_column"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("search_tab_list"),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 1. Search Input Bar
         item {
-            Text(
-                text = "Поиск записей",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = onSearchQueryChanged,
-                placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                onValueChange = onSearchQueryChange,
+                placeholder = {
+                    Text(
+                        tr(
+                            "Search by title, thoughts, notes, or tag...",
+                            "Поиск по заголовку, тексту, мыслям или тегу..."
+                        )
+                    )
+                },
                 leadingIcon = {
-                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = tr("Search", "Поиск")
+                    )
                 },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty() || selectedTag != null || selectedMood != null) {
-                        IconButton(
-                            onClick = {
-                                onSearchQueryChanged("")
-                                onToggleTag(null)
-                                onToggleMood(null)
-                            },
-                            modifier = Modifier.testTag("clear_search_filters_button")
-                        ) {
-                            Icon(imageVector = Icons.Filled.Clear, contentDescription = "Сбросить")
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = tr("Clear search", "Очистить поиск")
+                            )
                         }
                     }
                 },
@@ -412,59 +371,56 @@ fun SearchAndTagsTab(
             )
         }
 
-        // Mood Filter Strip
+        // 2. Filter Chips (Moods + Tags)
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Фильтр по настроению",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = tr("Filter by Mood & Tags", "Фильтр по настроению и тегам"),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (searchQuery.isNotBlank() || selectedMoodFilter != null || selectedTagFilter != null) {
+                        TextButton(
+                            onClick = onClearFilters,
+                            modifier = Modifier.testTag("clear_filters_button")
+                        ) {
+                            Text(tr("Reset All", "Сбросить"))
+                        }
+                    }
+                }
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     BotanicalMood.entries.forEach { mood ->
-                        val isSelected = selectedMood == mood
+                        val selected = selectedMoodFilter == mood
                         FilterChip(
-                            selected = isSelected,
-                            onClick = { onToggleMood(mood) },
-                            label = { Text(mood.titleRu) },
-                            leadingIcon = {
-                                BotanicalMoodIllustration(
-                                    mood = mood,
-                                    size = 20.dp,
-                                    showSoftBackground = false
-                                )
-                            },
-                            modifier = Modifier.testTag("search_mood_filter_${mood.key}")
+                            selected = selected,
+                            onClick = { onMoodFilterChange(mood) },
+                            label = { Text(mood.localizedTitle(lang)) },
+                            modifier = Modifier.testTag("filter_mood_${mood.key}")
                         )
                     }
                 }
-            }
-        }
 
-        // Tags Filter Cloud
-        if (allAvailableTags.isNotEmpty()) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Теги (${allAvailableTags.size})",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (allTags.isNotEmpty()) {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        allAvailableTags.forEach { tag ->
+                        allTags.forEach { tag ->
+                            val selected = selectedTagFilter == tag
                             FilterChip(
-                                selected = selectedTag.equals(tag, ignoreCase = true),
-                                onClick = { onToggleTag(tag) },
+                                selected = selected,
+                                onClick = { onTagFilterChange(tag) },
                                 label = { Text("#$tag") },
-                                modifier = Modifier.testTag("search_tag_filter_$tag")
+                                modifier = Modifier.testTag("filter_tag_$tag")
                             )
                         }
                     }
@@ -472,11 +428,15 @@ fun SearchAndTagsTab(
             }
         }
 
+        // 3. Results Count
         item {
             Text(
-                text = "Найдено записей: ${filteredEntries.size}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                text = tr(
+                    "Found ${filteredEntries.size} ${if (filteredEntries.size == 1) "entry" else "entries"}",
+                    "Найдено записей: ${filteredEntries.size}"
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -485,25 +445,34 @@ fun SearchAndTagsTab(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        BotanicalMoodIllustration(mood = BotanicalMood.MIST_FERN, size = 48.dp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Ничего не найдено",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                        Icon(
+                            imageVector = Icons.Outlined.SearchOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Попробуйте другое слово или выберите другой тег.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = tr("No matching entries found", "Записи не найдены"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = tr(
+                                "Try adjusting your search keywords or clearing active mood and tag filters.",
+                                "Попробуйте изменить поисковый запрос или сбросить выбранные фильтры."
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
@@ -511,479 +480,768 @@ fun SearchAndTagsTab(
                 }
             }
         } else {
-            items(filteredEntries, key = { it.id.ifBlank { it.dateIso } }) { entry ->
+            items(filteredEntries, key = { "search_${it.id}" }) { entry ->
                 DiaryEntryCard(
                     entry = entry,
-                    onClick = { onEditEntry(entry) },
-                    onTagClicked = { clickedTag -> onToggleTag(clickedTag) }
+                    onClick = { onViewEntry(entry) }
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Pure Analytics / Insights Tab:
+ * Displays ONLY emotional statistics, streaks, and mood distribution.
+ * PIN lock, Biometrics, Language, and Google Account Sign-Out live in SettingsScreen.
+ */
 @Composable
-fun AnalyticsAndProfileTab(
-    analytics: MoodAnalyticsData,
-    userEmail: String?,
-    isPinEnabled: Boolean,
-    onOpenPinSetup: () -> Unit,
-    onLockNow: () -> Unit,
-    onClearAllEntries: () -> Unit = {},
-    onSignOut: () -> Unit
+fun AnalyticsTab(
+    entries: List<DiaryEntry>,
+    availableAiPeriods: List<AvailableAnalysisPeriod> = remember(entries) {
+        PeriodInsightDetector.buildAvailablePeriods(entries)
+    },
+    selectedAiCategory: AnalysisPeriodType = AnalysisPeriodType.MONTHLY,
+    selectedAiPeriodKey: String = availableAiPeriods.firstOrNull()?.periodKey.orEmpty(),
+    savedAiReports: Map<String, AiPsychologicalReport> = emptyMap(),
+    aiUiState: AiAnalysisUiState = AiAnalysisUiState.Idle,
+    onSelectAiCategory: (AnalysisPeriodType) -> Unit = {},
+    onSelectAiPeriodKey: (String) -> Unit = {},
+    onGenerateOrRefreshAiReport: (AvailableAnalysisPeriod) -> Unit = {}
 ) {
+    val lang = LocalAppLanguage.current
+    val moodCounts = remember(entries) {
+        val counts = BotanicalMood.entries.associateWith { 0 }.toMutableMap()
+        entries.forEach { entry ->
+            val mood = entry.botanicalMood()
+            counts[mood] = (counts[mood] ?: 0) + 1
+        }
+        counts
+    }
+
+    val totalPhotos = remember(entries) { entries.sumOf { it.photoUrls.size } }
+    val uniqueDays = remember(entries) { entries.map { it.dateIso }.distinct().size }
+    val dominantMood = remember(moodCounts, entries) {
+        if (entries.isEmpty()) null else moodCounts.maxByOrNull { it.value }?.takeIf { it.value > 0 }?.key
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("analytics_lazy_column"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("analytics_tab_list"),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item {
-            Text(
-                text = "Аналитика и настройки",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Text(
-                text = "Статистика настроения и безопасность дневника",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // Summary Metric Cards
+        // 1. Key Metrics Grid
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Всего записей",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${analytics.totalEntries}",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Прошлые годы: ${analytics.pastYearsMemoriesCount}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Средний комфорт",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = String.format(java.util.Locale.US, "%.1f / 5", analytics.averageHarmony),
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                        Text(
-                            text = analytics.dominantMood?.let { "Чаще: ${it.titleRu}" } ?: "Нет данных",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                MetricStatCard(
+                    title = tr("Entries", "Записи"),
+                    value = entries.size.toString(),
+                    subtitle = tr("Total notes", "Всего в дневнике"),
+                    modifier = Modifier.weight(1f)
+                )
+                MetricStatCard(
+                    title = tr("Active Days", "Дней"),
+                    value = "$uniqueDays",
+                    subtitle = tr("Journaled days", "С записями"),
+                    modifier = Modifier.weight(1f)
+                )
+                MetricStatCard(
+                    title = tr("Photos", "Фото"),
+                    value = "$totalPhotos",
+                    subtitle = tr("Cloud WebP", "В облаке"),
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        // Emotional Wave Smooth Canvas Chart
+        // 1b. Gemini AI Psychological Analysis Hub (Monthly / Last 30 Days / Year in Review)
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            AiPsychologicalHubSection(
+                availablePeriods = availableAiPeriods,
+                selectedPeriodKey = selectedAiPeriodKey,
+                selectedCategory = selectedAiCategory,
+                savedReports = savedAiReports,
+                aiUiState = aiUiState,
+                onSelectCategory = onSelectAiCategory,
+                onSelectPeriodKey = onSelectAiPeriodKey,
+                onGenerateOrRefreshReport = onGenerateOrRefreshAiReport
+            )
+        }
+
+        // 2. Dominant Mood Highlight Card
+        if (dominantMood != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = dominantMood.softBgColor
+                    ),
+                    border = BorderStroke(1.dp, dominantMood.primaryColor.copy(alpha = 0.4f))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoGraph,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        BotanicalMoodIllustration(
+                            mood = dominantMood,
+                            size = 54.dp,
+                            showSoftBackground = false
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "График настроения",
+                                text = tr("MOST FREQUENT MOOD", "ПРЕОБЛАДАЮЩЕЕ НАСТРОЕНИЕ"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = dominantMood.primaryColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = dominantMood.localizedTitle(lang),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Динамика по последним дням (от 1 до 5)",
+                                text = dominantMood.localizedSubtitle(lang),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
+                }
+            }
+        }
 
-                    if (analytics.recentTrendPoints.size < 2) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Добавьте от 2 записей для построения графика",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        val primaryColor = MaterialTheme.colorScheme.primary
-                        val secondaryColor = MaterialTheme.colorScheme.secondary
-                        val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+        // 3. Mood Distribution Breakdown
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = tr("Emotional Balance", "Эмоциональный баланс"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = tr(
+                                "Distribution of moods across your journal entries",
+                                "Распределение состояний по всем вашим записям"
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp)
-                                .padding(horizontal = 6.dp, vertical = 8.dp)
-                        ) {
-                            val w = size.width
-                            val h = size.height
-                            val pts = analytics.recentTrendPoints
+                    MoodDistributionBar(
+                        moodCounts = moodCounts,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                            // Horizontal guide lines for 1..5
-                            for (level in 1..5) {
-                                val y = h - ((level - 1) / 4f) * h
-                                drawLine(
-                                    color = gridColor,
-                                    start = Offset(0f, y),
-                                    end = Offset(w, y),
-                                    strokeWidth = 1.dp.toPx()
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        BotanicalMood.entries.forEach { mood ->
+                            val count = moodCounts[mood] ?: 0
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                BotanicalMoodIllustration(
+                                    mood = mood,
+                                    size = 32.dp
                                 )
-                            }
-
-                            val offsets = pts.mapIndexed { idx, (_, value) ->
-                                val x = if (pts.size == 1) w / 2f else (idx.toFloat() / (pts.size - 1)) * w
-                                val y = h - ((value.coerceIn(1, 5) - 1) / 4f) * h
-                                Offset(x, y)
-                            }
-
-                            val linePath = Path().apply {
-                                moveTo(offsets.first().x, offsets.first().y)
-                                for (i in 1 until offsets.size) {
-                                    val prev = offsets[i - 1]
-                                    val curr = offsets[i]
-                                    val midX = (prev.x + curr.x) / 2f
-                                    cubicTo(midX, prev.y, midX, curr.y, curr.x, curr.y)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = mood.localizedTitle(lang),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = mood.localizedSubtitle(lang),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = mood.softBgColor
+                                ) {
+                                    Text(
+                                        text = "$count",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = mood.primaryColor,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
                                 }
                             }
-
-                            val fillPath = Path().apply {
-                                addPath(linePath)
-                                lineTo(offsets.last().x, h)
-                                lineTo(offsets.first().x, h)
-                                close()
-                            }
-
-                            drawPath(
-                                path = fillPath,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        primaryColor.copy(alpha = 0.25f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-
-                            drawPath(
-                                path = linePath,
-                                color = primaryColor,
-                                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                            )
-
-                            offsets.forEach { pt ->
-                                drawCircle(
-                                    color = secondaryColor,
-                                    radius = 5.dp.toPx(),
-                                    center = pt
-                                )
-                                drawCircle(
-                                    color = Color.White,
-                                    radius = 2.dp.toPx(),
-                                    center = pt
-                                )
-                            }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
 
+/**
+ * Dedicated Settings Screen opened from the gear IconButton in the main TopAppBar.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun SettingsScreen(
+    languageMode: AppLanguageMode,
+    onLanguageModeChange: (AppLanguageMode) -> Unit,
+    isPinEnabled: Boolean,
+    isBiometricAvailable: Boolean,
+    isBiometricEnabled: Boolean,
+    onBiometricEnabledChange: (Boolean) -> Unit,
+    userEmail: String?,
+    isSignedInWithGoogle: Boolean = userEmail != null,
+    onSignInWithGoogle: () -> Unit = {},
+    notificationsGranted: Boolean,
+    onRequestNotificationPermission: () -> Unit,
+    onSetupOrChangePin: () -> Unit,
+    onDisablePin: () -> Unit,
+    onLockNow: () -> Unit,
+    onClearAllEntries: () -> Unit,
+    onSignOut: () -> Unit,
+    onBack: () -> Unit
+) {
+    BackHandler(onBack = onBack)
+    var showConfirmClearDialog by remember { mutableStateOf(false) }
+
+    if (showConfirmClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmClearDialog = false },
+            title = { Text(tr("Delete All Entries?", "Удалить все записи?")) },
+            text = {
+                Text(
+                    tr(
+                        "This will permanently remove all journal entries and time capsule letters from your cloud account. This action cannot be undone.",
+                        "Все записи дневника и письма в будущее будут безвозвратно удалены из облака. Это действие нельзя отменить."
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmClearDialog = false
+                        onClearAllEntries()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(tr("Delete All", "Удалить всё"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmClearDialog = false }) {
+                    Text(tr("Cancel", "Отмена"))
+                }
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = tr("Settings", "Настройки"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag("settings_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = tr("Back", "Назад")
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .testTag("settings_screen_list"),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. App Language Selector Card (Auto / System, English, Русский)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            analytics.recentTrendPoints.forEach { (dateLabel, _) ->
+                            Icon(
+                                imageVector = Icons.Outlined.Language,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = dateLabel,
+                                    text = tr("App Language", "Язык приложения"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr(
+                                        "Automatically detects your phone language or lets you choose manually",
+                                        "Автоматически определяет язык телефона или позволяет выбрать вручную"
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
 
-        // Mood Distribution
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Распределение настроений",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    val total = analytics.totalEntries.coerceAtLeast(1)
-                    BotanicalMood.entries.forEach { mood ->
-                        val count = analytics.moodCounts[mood] ?: 0
-                        val fraction = count.toFloat() / total.toFloat()
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            BotanicalMoodIllustration(mood = mood, size = 32.dp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = mood.titleRu,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = "$count дн.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = mood.primaryColor
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                LinearProgressIndicator(
-                                    progress = { fraction },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(CircleShape),
-                                    color = mood.primaryColor,
-                                    trackColor = mood.softBgColor
+                            val options = listOf(
+                                AppLanguageMode.SYSTEM to tr("Auto (Phone)", "Авто (Телефон)"),
+                                AppLanguageMode.EN to "English",
+                                AppLanguageMode.RU to "Русский"
+                            )
+                            options.forEach { (mode, label) ->
+                                val selected = languageMode == mode
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onLanguageModeChange(mode) },
+                                    label = {
+                                        Text(
+                                            text = label,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    },
+                                    leadingIcon = if (selected) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    } else null,
+                                    modifier = Modifier.testTag("lang_mode_${mode.key}")
                                 )
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Top Tags
-        if (analytics.topResourceTags.isNotEmpty()) {
+            // 2. Privacy, PIN Lock & Biometrics (Fingerprint) Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = "Популярные теги",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            analytics.topResourceTags.forEach { (tag, count) ->
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(10.dp)
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tr(
+                                        "PIN & Biometric Protection",
+                                        "Защита PIN-кодом и биометрией"
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isPinEnabled) {
+                                        tr(
+                                            "4-digit PIN protection is active",
+                                            "Защита 4-значным PIN-кодом включена"
+                                        )
+                                    } else {
+                                        tr(
+                                            "Set a 4-digit PIN to unlock with PIN or fingerprint",
+                                            "Установите 4-значный PIN, чтобы входить по PIN или отпечатку пальца"
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = onSetupOrChangePin,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                                modifier = Modifier.testTag("setup_pin_button")
+                            ) {
+                                Text(
+                                    text = if (isPinEnabled) tr("Change PIN", "Изменить PIN")
+                                    else tr("Enable PIN", "Включить PIN"),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            if (isPinEnabled) {
+                                OutlinedButton(
+                                    onClick = onLockNow,
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                    modifier = Modifier.testTag("lock_now_button")
                                 ) {
                                     Text(
-                                        text = "#$tag ($count)",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        text = tr("Lock Now", "Заблокировать"),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                TextButton(
+                                    onClick = onDisablePin,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                    modifier = Modifier.testTag("disable_pin_button")
+                                ) {
+                                    Text(
+                                        text = tr("Disable PIN", "Отключить"),
+                                        color = MaterialTheme.colorScheme.error,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
                         }
+
+                        // Biometric (Fingerprint) Toggle when PIN is enabled
+                        if (isPinEnabled) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fingerprint,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Column {
+                                        Text(
+                                            text = tr(
+                                                "Fingerprint / Biometrics",
+                                                "Отпечаток пальца / Биометрия"
+                                            ),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (isBiometricAvailable) {
+                                                tr(
+                                                    "Use fingerprint sensor on unlock",
+                                                    "Вход по сканеру отпечатка пальца"
+                                                )
+                                            } else {
+                                                tr(
+                                                    "Fingerprint not enrolled or unsupported on this device",
+                                                    "На этом устройстве отпечаток пальца не настроен или не поддерживается"
+                                                )
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isBiometricEnabled && isBiometricAvailable,
+                                    onCheckedChange = onBiometricEnabledChange,
+                                    enabled = isBiometricAvailable,
+                                    modifier = Modifier.testTag("biometric_toggle_switch")
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // Security & PIN Code Lock Card (Stacked buttons, zero overflow!)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            // 3. Notifications Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (isPinEnabled) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Защита дневника PIN-кодом",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.NotificationsActive,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
                             )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tr(
+                                        "Time Capsule Notifications",
+                                        "Уведомления о письмах в будущее"
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (notificationsGranted) {
+                                        tr(
+                                            "Notifications enabled — Android will alert you at the exact unlock hour & minute even when Vent is closed.",
+                                            "Уведомления включены — Android пришлет пуш-уведомление в точную минуту открытия письма, даже если приложение закрыто."
+                                        )
+                                    } else {
+                                        tr(
+                                            "Allow notifications so Vent can alert you when a future letter unlocks.",
+                                            "Разрешите уведомления, чтобы Vent сообщил вам, когда откроется письмо в будущее."
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (!notificationsGranted) {
+                            OutlinedButton(
+                                onClick = onRequestNotificationPermission,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(tr("Allow Notifications", "Разрешить уведомления"))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Account & Cloud Sync Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tr("Google Cloud Account", "Аккаунт Google и облако"),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isSignedInWithGoogle) {
+                                        userEmail ?: tr("Signed in with Google", "Вход выполнен через Google")
+                                    } else {
+                                        tr(
+                                            "Not signed in (entries stored on device)",
+                                            "Вход не выполнен (записи хранятся на устройстве)"
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            if (isSignedInWithGoogle) {
+                                OutlinedButton(
+                                    onClick = onSignOut,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.testTag("sign_out_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                                        contentDescription = tr("Sign Out", "Выйти"),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(tr("Sign Out", "Выйти"), maxLines = 1)
+                                }
+                            } else {
+                                Button(
+                                    onClick = onSignInWithGoogle,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.testTag("settings_google_sign_in_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = tr("Sign in with Google", "Войти в Google"),
+                                        maxLines = 1,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = if (isPinEnabled) "PIN-код включен — требуется ввод при запуске"
-                                else "Защита не установлена",
+                                text = tr("Clear all cloud entries", "Очистить все записи в облаке"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
-                    }
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilledTonalButton(
-                            onClick = onOpenPinSetup,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("manage_pin_button")
-                        ) {
-                            Text(
-                                text = if (isPinEnabled) "Изменить или отключить PIN" else "Установить PIN-код",
-                                maxLines = 1
-                            )
-                        }
-                        if (isPinEnabled) {
-                            OutlinedButton(
-                                onClick = onLockNow,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("lock_diary_now_button")
+                            TextButton(
+                                onClick = { showConfirmClearDialog = true },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                modifier = Modifier.testTag("clear_all_entries_button")
                             ) {
-                                Text("Заблокировать сейчас", maxLines = 1)
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteSweep,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(tr("Clear All", "Очистить всё"))
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
 
-        // Cloud Account & Sign-Out Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Синхронизация с аккаунтом",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = userEmail ?: "Google аккаунт подключен",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    if (analytics.totalEntries > 0) {
-                        OutlinedButton(
-                            onClick = onClearAllEntries,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("clear_all_entries_button")
-                        ) {
-                            Text("Очистить все записи дневника", maxLines = 1)
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = onSignOut,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("sign_out_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.Logout,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Выйти из аккаунта", maxLines = 1)
-                    }
-                }
-            }
+@Composable
+private fun MetricStatCard(
+    title: String,
+    value: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                fontFamily = NunitoFontFamily,
+                fontSize = 26.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

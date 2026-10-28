@@ -29,13 +29,33 @@ class PinLockPreferences(context: Context) {
         prefs.edit().remove(KEY_PIN_HASH).apply()
     }
 
+    fun isBiometricEnabled(): Boolean {
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
+    fun isAuthSkipped(): Boolean {
+        return prefs.getBoolean(KEY_AUTH_SKIPPED, false)
+    }
+
+    fun setAuthSkipped(skipped: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTH_SKIPPED, skipped).apply()
+    }
+
     private fun hashPin(pin: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(("herbarium_salt_$pin").toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private companion object {
-        const val KEY_PIN_HASH = "pin_sha256_hash"
+    companion object {
+        const val LOCAL_GUEST_UID = "local_guest"
+        private const val KEY_PIN_HASH = "pin_sha256_hash"
+        private const val KEY_BIOMETRIC_ENABLED = "biometric_unlock_enabled"
+        private const val KEY_AUTH_SKIPPED = "google_auth_skipped"
     }
 }
+
