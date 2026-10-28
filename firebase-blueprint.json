@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "DiaryEntry": {
+      "title": "DiaryEntry",
+      "description": "A personal psychological diary entry associated with a specific calendar date, botanical mood state, reflection prompt, tags, and compressed photo memories.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Google user UID who owns this diary entry."
+        },
+        "dateIso": {
+          "type": "string",
+          "description": "Calendar date of the entry in YYYY-MM-DD format."
+        },
+        "monthDay": {
+          "type": "string",
+          "description": "Month and day in MM-DD format for On This Day past-year lookups."
+        },
+        "moodKey": {
+          "type": "string",
+          "enum": [
+            "BLOOM",
+            "CALM_LEAF",
+            "WARM_ROOT",
+            "MIST_FERN",
+            "AUTUMN_WIND",
+            "WINTER_SEED"
+          ],
+          "description": "Custom botanical mood state identifier."
+        },
+        "moodIntensity": {
+          "type": "integer",
+          "description": "Emotional harmony/energy rating from 1 to 5."
+        },
+        "title": {
+          "type": "string",
+          "description": "Headline or key moment of the day."
+        },
+        "content": {
+          "type": "string",
+          "description": "Main psychological journal text for the day."
+        },
+        "reflectionPrompt": {
+          "type": "string",
+          "description": "Selected guided psychological reflection prompt."
+        },
+        "reflectionAnswer": {
+          "type": "string",
+          "description": "User's personal reflection response to the prompt."
+        },
+        "tags": {
+          "type": "array",
+          "description": "List of keyword tags attached to the entry (max 15)."
+        },
+        "photosBase64": {
+          "type": "array",
+          "description": "List of compressed Base64 photo thumbnails attached to the entry (max 4)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the entry was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the entry was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "dateIso",
+        "monthDay",
+        "moodKey",
+        "moodIntensity",
+        "title",
+        "content",
+        "tags",
+        "photosBase64",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/entries/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/DiaryEntry"
+      },
+      "description": "Per-user subcollection of personal psychological diary entries isolated by userId."
+    }
+  }
+}

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Warm cream journal card silhouette -->
+    <path
+        android:fillColor="#FAF6F0"
+        android:pathData="M34,26 C34,22.686 36.686,20 40,20 L68,20 C71.314,20 74,22.686 74,26 L74,82 C74,85.314 71.314,88 68,88 L40,88 C36.686,88 34,85.314 34,82 Z" />
+    <!-- Terracotta spine accent -->
+    <path
+        android:fillColor="#C87A5B"
+        android:pathData="M34,26 C34,22.686 36.686,20 40,20 L42,20 L42,88 L40,88 C36.686,88 34,85.314 34,82 Z" />
+    <!-- Botanical stem -->
+    <path
+        android:strokeColor="#4A6B53"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:pathData="M56,74 C56,60 57,48 56,36" />
+    <!-- Left sage leaf -->
+    <path
+        android:fillColor="#4A6B53"
+        android:pathData="M56,60 C46,58 44,49 52,47 C56,46 57,54 56,60 Z" />
+    <!-- Right sage leaf -->
+    <path
+        android:fillColor="#6A8E74"
+        android:pathData="M56,53 C66,51 68,42 60,40 C56,39 55,47 56,53 Z" />
+    <!-- Golden terracotta flower bloom -->
+    <path
+        android:fillColor="#D4A359"
+        android:pathData="M56,28 C60,28 63,31 63,35 C63,39 60,42 56,42 C52,42 49,39 49,35 C49,31 52,28 56,28 Z" />
+    <path
+        android:fillColor="#C87A5B"
+        android:pathData="M56,32 C57.657,32 59,33.343 59,35 C59,36.657 57.657,38 56,38 C54.343,38 53,36.657 53,35 C53,33.343 54.343,32 56,32 Z" />
+</vector>

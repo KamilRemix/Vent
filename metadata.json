@@ -1,0 +1,6 @@
+{
+  "name": "Vent",
+  "description": "Vent is a mindful personal diary and emotional reflection app featuring custom mood art, sealed time capsule letters, calendar retrospectives, and mood insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

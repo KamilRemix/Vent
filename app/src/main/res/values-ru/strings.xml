@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Vent</string>
+    <string name="app_subtitle">Осознанный дневник эмоций и мыслей</string>
+    <string name="sign_in_google">Войти через Google</string>
+    <string name="sign_in_welcome_title">Пространство для твоих мыслей</string>
+    <string name="sign_in_welcome_body">Записывай важные моменты, отслеживай внутреннее состояние и отправляй письма себе в будущее с надежной облачной синхронизацией.</string>
+    <string name="nav_today">Дневник</string>
+    <string name="nav_calendar">Календарь</string>
+    <string name="nav_letters">Капсула</string>
+    <string name="nav_search">Поиск</string>
+    <string name="nav_analytics">Аналитика</string>
+    <string name="pin_unlock_title">Дневник защищен</string>
+    <string name="pin_unlock_subtitle">Введите 4-значный PIN-код для входа</string>
+</resources>
