@@ -472,8 +472,11 @@ class DiaryViewModel(
     fun selectAiPeriodKey(periodKey: String, allEntries: List<DiaryEntry>) {
         _selectedAiPeriodKey.value = periodKey
         val periods = PeriodInsightDetector.buildAvailablePeriods(allEntries)
-        periods.firstOrNull { it.periodKey == periodKey }?.let { matched ->
-            _selectedAiCategory.value = matched.periodType
+        val matched = periods.firstOrNull { it.periodKey == periodKey }
+        when {
+            matched != null -> _selectedAiCategory.value = matched.periodType
+            periodKey.startsWith("DAY-") -> _selectedAiCategory.value = AnalysisPeriodType.DAILY
+            periodKey == "LAST-7-DAYS" -> _selectedAiCategory.value = AnalysisPeriodType.WEEKLY
         }
         if (_aiAnalysisUiState.value !is AiAnalysisUiState.Generating) {
             _aiAnalysisUiState.value = AiAnalysisUiState.Idle

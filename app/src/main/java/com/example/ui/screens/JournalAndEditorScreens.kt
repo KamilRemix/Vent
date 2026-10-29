@@ -213,20 +213,44 @@ fun JournalHomeTab(
                     )
                 }
 
-                // Only show top-right action button when entries already exist for the selected date
+                // Only show top-right action buttons when entries already exist for the selected date
                 if (entriesForSelectedDate.isNotEmpty()) {
-                    FilledTonalButton(
-                        onClick = { onCreateNewForDate(selectedDateIso) },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("add_another_entry_button")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(tr("New Entry", "Новая запись"))
+                        OutlinedButton(
+                            onClick = { onOpenAiAnalysis("DAY-$selectedDateIso") },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("analyze_selected_day_ai_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = tr("AI Day", "ИИ-день"),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = { onCreateNewForDate(selectedDateIso) },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("add_another_entry_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(tr("New", "Запись"))
+                        }
                     }
                 }
             }
@@ -580,6 +604,7 @@ fun DiaryEntryReaderScreen(
     entry: DiaryEntry,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onAnalyzeDayWithAi: ((String) -> Unit)? = null,
     onBack: () -> Unit
 ) {
     BackHandler(onBack = onBack)
@@ -840,6 +865,72 @@ fun DiaryEntryReaderScreen(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 6. Gemini AI Analysis for this Day
+            if (onAnalyzeDayWithAi != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = tr("GEMINI AI • DAILY PSYCHOLOGICAL INSIGHT", "GEMINI AI • ПСИХОЛОГИЧЕСКИЙ РАЗБОР ДНЯ"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = tr(
+                                        "Analyze your thoughts and mood for ${DateAndPhotoUtils.formatShortDate(entry.dateIso, lang)}",
+                                        "Разбор ваших мыслей и состояния за ${DateAndPhotoUtils.formatShortDate(entry.dateIso, lang)}"
+                                    ),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { onAnalyzeDayWithAi("DAY-${entry.dateIso}") },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("reader_analyze_day_ai_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = tr("Analyze This Day with Gemini AI", "ИИ-разбор этого дня (Gemini)"),
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

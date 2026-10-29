@@ -153,58 +153,37 @@ fun launchOneTapOrGoogleSignIn(
 
     scope.launch {
         try {
-            // Step 1: Sign-in bottom sheet for previously authorized accounts (supports Auto Sign-in)
-            val authorizedGoogleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(true)
-                .setServerClientId(clientId)
-                .setAutoSelectEnabled(true)
-                .setNonce(generateSecureRandomNonce())
-                .build()
+            val result = if (silentIfNoCredential) {
+                // Silent auto sign-in request with GetGoogleIdOption
+                val authorizedGoogleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(true)
+                    .setServerClientId(clientId)
+                    .setAutoSelectEnabled(true)
+                    .setNonce(generateSecureRandomNonce())
+                    .build()
 
-            val authorizedRequest = GetCredentialRequest.Builder()
-                .addCredentialOption(authorizedGoogleIdOption)
-                .build()
+                val authorizedRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(authorizedGoogleIdOption)
+                    .build()
 
-            val result = try {
                 credentialManager.getCredential(
                     request = authorizedRequest,
                     context = activityContext
                 )
-            } catch (e: NoCredentialException) {
-                // Step 2: User has not signed in to Vent yet — show Sign-in bottom sheet (One Tap UI)
-                // for all Google accounts on the device (pre-selected account + arrow + "Continue as...")
-                val allAccountsGoogleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(clientId)
-                    .setAutoSelectEnabled(false)
-                    .setNonce(generateSecureRandomNonce())
+            } else {
+                // Interactive sign-in request with GetSignInWithGoogleOption
+                val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
+                    serverClientId = clientId
+                ).setNonce(generateSecureRandomNonce()).build()
+
+                val interactiveRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInWithGoogleOption)
                     .build()
 
-                val allAccountsRequest = GetCredentialRequest.Builder()
-                    .addCredentialOption(allAccountsGoogleIdOption)
-                    .build()
-
-                try {
-                    credentialManager.getCredential(
-                        request = allAccountsRequest,
-                        context = activityContext
-                    )
-                } catch (innerNoCred: NoCredentialException) {
-                    if (silentIfNoCredential) {
-                        throw innerNoCred
-                    }
-                    // Step 3: Only on explicit button click if One Tap bottom sheet is on Play Services cooldown
-                    val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
-                        serverClientId = clientId
-                    ).setNonce(generateSecureRandomNonce()).build()
-                    val fallbackRequest = GetCredentialRequest.Builder()
-                        .addCredentialOption(signInWithGoogleOption)
-                        .build()
-                    credentialManager.getCredential(
-                        request = fallbackRequest,
-                        context = activityContext
-                    )
-                }
+                credentialManager.getCredential(
+                    request = interactiveRequest,
+                    context = activityContext
+                )
             }
 
             val credential = result.credential

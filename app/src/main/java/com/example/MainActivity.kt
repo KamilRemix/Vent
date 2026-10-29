@@ -226,8 +226,8 @@ fun BotanicalDiaryApp() {
             entries.flatMap { it.tags }.distinct().sorted()
         }
         val todayIso = remember { DateAndPhotoUtils.todayIso() }
-        val availableAiPeriods = remember(entries, todayIso) {
-            PeriodInsightDetector.buildAvailablePeriods(entries, todayIso)
+        val availableAiPeriods = remember(entries, todayIso, selectedDateIso) {
+            PeriodInsightDetector.buildAvailablePeriods(entries, todayIso, selectedDateIso)
         }
         val recommendedHomeAiPeriod = remember(entries, savedAiReports, todayIso) {
             PeriodInsightDetector.recommendedHomeBannerPeriod(entries, savedAiReports, todayIso)
@@ -394,6 +394,15 @@ fun BotanicalDiaryApp() {
                         onDeleteClick = {
                             viewModel.deleteDiaryEntry(context = context, entryId = liveEntry.id)
                             viewingEntry = null
+                        },
+                        onAnalyzeDayWithAi = { periodKey ->
+                            viewingEntry = null
+                            viewModel.selectAiPeriodKey(periodKey, entries)
+                            currentTab = MainDestination.INSIGHTS
+                            val targetPeriod = availableAiPeriods.firstOrNull { it.periodKey == periodKey }
+                            if (targetPeriod != null) {
+                                viewModel.generateAiPsychologicalReport(context, targetPeriod, entries)
+                            }
                         },
                         onBack = { viewingEntry = null }
                     )

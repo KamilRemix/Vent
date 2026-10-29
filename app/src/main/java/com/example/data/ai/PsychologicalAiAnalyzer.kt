@@ -15,13 +15,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 
 enum class AnalysisPeriodType(val id: String) {
+    DAILY("DAILY"),
+    WEEKLY("WEEKLY"),
     MONTHLY("MONTHLY"),
     LAST_30_DAYS("LAST_30_DAYS"),
     YEARLY_REVIEW("YEARLY_REVIEW")
@@ -73,7 +76,8 @@ data class AiPsychologicalReport(
     val dominantMoodKey: String,
     val topTags: List<String>,
     val weekdayBreakdown: List<WeekdayMoodSummary>,
-    val createdAtMillis: Long
+    val createdAtMillis: Long,
+    val aiModelBadge: String = "Gemini 3.8 Flash • Firebase AI Logic"
 ) {
     fun dominantMood(): BotanicalMood = BotanicalMood.fromKey(dominantMoodKey)
 }
@@ -118,11 +122,13 @@ object PeriodInsightDetector {
     }
 
     /**
-     * Builds the list of selectable periods for Monthly, Last 30 Days, and Yearly (December / Year in Review) analysis.
+     * Builds the list of selectable periods for Daily, Weekly (7 Days), Monthly, Last 30 Days,
+     * and Yearly (December / Year in Review) Gemini AI analysis.
      */
     fun buildAvailablePeriods(
         allEntries: List<DiaryEntry>,
-        todayIso: String = DateAndPhotoUtils.todayIso()
+        todayIso: String = DateAndPhotoUtils.todayIso(),
+        extraDateIso: String? = null
     ): List<AvailableAnalysisPeriod> {
         val unlocked = unlockedEntriesOnly(allEntries, todayIso)
         val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
@@ -133,6 +139,66 @@ object PeriodInsightDetector {
 
         val result = mutableListOf<AvailableAnalysisPeriod>()
 
+        // 0. DAILY Periods: Today + up to 30 recent days with entries (plus extraDateIso if provided)
+        val todayShortEn = DateAndPhotoUtils.formatShortDate(todayIso, AppLanguage.EN)
+        val todayShortRu = DateAndPhotoUtils.formatShortDate(todayIso, AppLanguage.RU)
+        val todayEntries = unlocked.filter { it.dateIso == todayIso }
+        result.add(
+            AvailableAnalysisPeriod(
+                periodKey = "DAY-$todayIso",
+                periodType = AnalysisPeriodType.DAILY,
+                titleEn = "Today ($todayShortEn)",
+                titleRu = "Сегодня ($todayShortRu)",
+                subtitleEn = "Gemini AI reflection on today's personal entries",
+                subtitleRu = "Gemini AI разбор личных записей за сегодня",
+                entriesCount = todayEntries.size,
+                isEndOfPeriodHighlight = todayEntries.isNotEmpty()
+            )
+        )
+
+        val recentDistinctDates = (unlocked.map { it.dateIso } + listOfNotNull(extraDateIso))
+            .filter { it != todayIso && it.matches(Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")) }
+            .distinct()
+            .sortedDescending()
+            .take(30)
+
+        recentDistinctDates.forEach { dIso ->
+            val shortEn = DateAndPhotoUtils.formatShortDate(dIso, AppLanguage.EN)
+            val shortRu = DateAndPhotoUtils.formatShortDate(dIso, AppLanguage.RU)
+            val fullEn = DateAndPhotoUtils.formatFullDate(dIso, AppLanguage.EN)
+            val fullRu = DateAndPhotoUtils.formatFullDate(dIso, AppLanguage.RU)
+            val dayCount = unlocked.count { it.dateIso == dIso }
+            result.add(
+                AvailableAnalysisPeriod(
+                    periodKey = "DAY-$dIso",
+                    periodType = AnalysisPeriodType.DAILY,
+                    titleEn = shortEn,
+                    titleRu = shortRu,
+                    subtitleEn = "Daily AI reflection for $fullEn ($dayCount entries)",
+                    subtitleRu = "ИИ-разбор дня за $fullRu (записей: $dayCount)",
+                    entriesCount = dayCount,
+                    isEndOfPeriodHighlight = false
+                )
+            )
+        }
+
+        // 0b. WEEKLY (Last 7 Days)
+        val sevenDaysAgoCal = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -6) }
+        val sevenDaysAgoIso = DateAndPhotoUtils.calendarToIso(sevenDaysAgoCal)
+        val last7Entries = unlocked.filter { it.dateIso in sevenDaysAgoIso..todayIso }
+        result.add(
+            AvailableAnalysisPeriod(
+                periodKey = "LAST-7-DAYS",
+                periodType = AnalysisPeriodType.WEEKLY,
+                titleEn = "Last 7 Days",
+                titleRu = "Последние 7 дней",
+                subtitleEn = "Weekly Gemini AI emotional check-in",
+                subtitleRu = "Недельный ИИ-разбор состояния за 7 дней",
+                entriesCount = last7Entries.size,
+                isEndOfPeriodHighlight = false
+            )
+        )
+
         // 1. Current Month
         val currentMonthEntries = unlocked.filter { it.dateIso.startsWith(currentYearMonth) }
         val isEndOfMonthNow = dayOfMonth >= 25
@@ -142,8 +208,8 @@ object PeriodInsightDetector {
                 periodType = AnalysisPeriodType.MONTHLY,
                 titleEn = "${monthNamesEn[currentMonthZero]} $currentYear",
                 titleRu = "${monthNamesRu[currentMonthZero]} $currentYear",
-                subtitleEn = if (isEndOfMonthNow) "End-of-month summary ready" else "Monthly reflection",
-                subtitleRu = if (isEndOfMonthNow) "Итоги конца месяца" else "Разбор за месяц",
+                subtitleEn = if (isEndOfMonthNow) "End-of-month Gemini summary ready" else "Monthly Gemini AI reflection",
+                subtitleRu = if (isEndOfMonthNow) "Итоги конца месяца (Gemini AI)" else "Разбор за месяц (Gemini AI)",
                 entriesCount = currentMonthEntries.size,
                 isEndOfPeriodHighlight = isEndOfMonthNow && currentMonthEntries.isNotEmpty()
             )
@@ -222,7 +288,8 @@ object PeriodInsightDetector {
     }
 
     /**
-     * Filters entries belonging to a specific `periodKey` ("YYYY-MM", "YYYY-YEAR", or "LAST-30-DAYS").
+     * Filters entries belonging to a specific `periodKey`
+     * ("DAY-YYYY-MM-DD", "LAST-7-DAYS", "YYYY-MM", "YYYY-YEAR", or "LAST-30-DAYS").
      */
     fun entriesForPeriod(
         allEntries: List<DiaryEntry>,
@@ -231,6 +298,16 @@ object PeriodInsightDetector {
     ): List<DiaryEntry> {
         val unlocked = unlockedEntriesOnly(allEntries, todayIso)
         return when {
+            periodKey.startsWith("DAY-") -> {
+                val targetDateIso = periodKey.removePrefix("DAY-")
+                unlocked.filter { it.dateIso == targetDateIso }.sortedBy { it.dateIso }
+            }
+            periodKey == "LAST-7-DAYS" -> {
+                val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
+                cal.add(Calendar.DAY_OF_YEAR, -6)
+                val startIso = DateAndPhotoUtils.calendarToIso(cal)
+                unlocked.filter { it.dateIso in startIso..todayIso }.sortedBy { it.dateIso }
+            }
             periodKey == "LAST-30-DAYS" -> {
                 val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
                 cal.add(Calendar.DAY_OF_YEAR, -30)
@@ -284,12 +361,18 @@ object PeriodInsightDetector {
             }
         }
 
-        // Priority 4: Current month if the user has at least 1 entry
+        // Priority 4: Today's Daily Reflection if user wrote an entry today
+        val todayPeriod = periods.firstOrNull { it.periodKey == "DAY-$todayIso" && it.entriesCount > 0 }
+        if (todayPeriod != null && !savedReports.containsKey(todayPeriod.periodKey)) {
+            return todayPeriod
+        }
+
+        // Priority 5: Current month if the user has at least 1 entry
         if (currentMonthPeriod != null && currentMonthPeriod.entriesCount >= 1) {
             return currentMonthPeriod
         }
 
-        // Priority 5: Any period that has entries
+        // Priority 6: Any period that has entries
         val anyWithEntries = periods.firstOrNull { it.entriesCount > 0 }
         if (anyWithEntries != null) return anyWithEntries
 
@@ -359,33 +442,38 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     private val backgroundAiScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val reportJsonSchema = Schema.obj(
-        mapOf(
+        properties = mapOf(
             "emotionalHeadline" to Schema.string(
-                "A warm, poetic 3-6 word title describing the user's emotional state during this period"
+                description = "A warm, poetic 3-6 word title describing the user's emotional state during this period"
             ),
             "warmLetter" to Schema.string(
-                "An empathetic, deeply personal 2-3 paragraph letter from a caring psychologist addressing the user directly ('ты' in Russian, 'you' in English), reflecting on their real journal entries, validating their feelings, and offering warmth"
+                description = "An empathetic, deeply personal 2-3 paragraph letter from a caring psychologist addressing the user directly ('ты' in Russian, 'you' in English), reflecting on their real journal entries, validating their feelings, and offering warmth"
             ),
             "emotionalArcSummary" to Schema.string(
-                "A clear psychological summary of how the user's mood and energy shifted from the beginning to the end of the period"
+                description = "A clear psychological summary of how the user's mood and energy shifted across this day, week, month, or year"
             ),
             "energySources" to Schema.array(
-                Schema.string("Specific activity, habit, person, or moment from the user's entries that restored energy, calm, or joy")
+                items = Schema.string(description = "Specific activity, habit, person, or moment from the user's entries that restored energy, calm, or joy"),
+                description = "List of energy sources and anchors"
             ),
             "stressTriggers" to Schema.array(
-                Schema.string("Specific recurring theme, workload, worry, or situation from the entries that caused fatigue, anxiety, or sadness")
+                items = Schema.string(description = "Specific recurring theme, workload, worry, or situation from the entries that caused fatigue, anxiety, or sadness"),
+                description = "List of stress triggers and energy drains"
             ),
             "cognitivePatterns" to Schema.array(
-                Schema.string("Gentle psychological observation about the user's thinking patterns, self-talk, perfectionism, or emotional coping")
+                items = Schema.string(description = "Gentle psychological observation about the user's thinking patterns, self-talk, perfectionism, or emotional coping"),
+                description = "List of cognitive patterns and inner voice insights"
             ),
             "quietWins" to Schema.array(
-                Schema.string("A quiet personal victory, moment of resilience, or step forward found in the user's entries that deserves appreciation")
+                items = Schema.string(description = "A quiet personal victory, moment of resilience, or step forward found in the user's entries that deserves appreciation"),
+                description = "List of quiet personal wins"
             ),
             "weekdayAndTagInsights" to Schema.string(
-                "Observation connecting the user's day-of-week mood rhythm and most frequent tags with their emotional state"
+                description = "Observation connecting the user's day/weekday mood rhythm and most frequent tags with their emotional state"
             ),
             "gentleAdviceAndQuestions" to Schema.array(
-                Schema.string("A concrete, compassionate self-care practice or reflective question for the upcoming month or year")
+                items = Schema.string(description = "A concrete, compassionate self-care practice or reflective question for the upcoming days, month, or year"),
+                description = "List of gentle practices and reflective questions"
             )
         )
     )
@@ -411,10 +499,10 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     ): Result<AiPsychologicalReport> {
         val unlockedPeriodEntries = PeriodInsightDetector.unlockedEntriesOnly(periodEntries)
         val unlockedAllEntries = PeriodInsightDetector.unlockedEntriesOnly(allEntries)
-        val effectiveEntries = if (unlockedPeriodEntries.isNotEmpty()) {
-            unlockedPeriodEntries
-        } else {
-            unlockedAllEntries
+        val effectiveEntries = when {
+            unlockedPeriodEntries.isNotEmpty() -> unlockedPeriodEntries
+            period.periodType == AnalysisPeriodType.DAILY -> emptyList()
+            else -> unlockedAllEntries
         }
 
         val sampleTitles = effectiveEntries
@@ -423,9 +511,9 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
         // Stage 1 (16%): Reading entries & context
         val stage1Title = if (lang == AppLanguage.RU) {
-            "Этап 1 из 5 • Чтение записей дневника"
+            "Этап 1 из 5 • Чтение записей дневника (Gemini AI)"
         } else {
-            "Step 1 of 5 • Reading journal entries"
+            "Step 1 of 5 • Reading journal entries (Gemini AI)"
         }
         val stage1Detail = if (lang == AppLanguage.RU) {
             if (sampleTitles.isNotEmpty()) {
@@ -451,7 +539,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             ?.key ?: BotanicalMood.CALM_LEAF
         val topTags = PeriodInsightDetector.computeTopTags(effectiveEntries)
 
-        // Launch non-blocking cloud inference in background IO scope if entries exist
+        // Launch non-blocking cloud inference via Firebase AI Logic (Gemini 3.8 Flash) with 60s timeout
         val cloudDeferred = if (effectiveEntries.isNotEmpty()) {
             val prompt = buildPsychologistPrompt(
                 period = period,
@@ -464,10 +552,17 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             )
             backgroundAiScope.async {
                 try {
-                    val response = primaryModel.generateContent(prompt)
+                    val response = withTimeout(60_000L) {
+                        primaryModel.generateContent(prompt)
+                    }
                     response.text?.takeIf { it.isNotBlank() }
+                } catch (e: TimeoutCancellationException) {
+                    Log.e(TAG, "Gemini AI generation timed out after 60 seconds", e)
+                    null
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    Log.w(TAG, "Cloud AI call finished with fallback: ${e.message}")
+                    Log.e(TAG, "Firebase AI generation failed", e)
                     null
                 }
             }
@@ -475,7 +570,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             null
         }
 
-        delay(420L)
+        delay(350L)
 
         // Stage 2 (38%): Emotional trajectory & dominant mood
         val stage2Title = if (lang == AppLanguage.RU) {
@@ -489,7 +584,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             "Dominant state: ${dominantMood.titleEn}, average harmony ${String.format("%.1f", avgIntensity)}/5"
         }
         onProgress(38, stage2Title, stage2Detail)
-        delay(480L)
+        delay(380L)
 
         // Stage 3 (64%): Stress triggers & energy anchors
         val stage3Title = if (lang == AppLanguage.RU) {
@@ -498,46 +593,50 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             "Step 3 of 5 • Identifying energy anchors & stress triggers"
         }
         val stage3Detail = if (lang == AppLanguage.RU) {
-            "Выделяем события, восстанавливающие ресурс, и факторы эмоционального напряжения..."
+            "Gemini выделяет события, восстанавливающие ресурс, и факторы эмоционального напряжения..."
         } else {
-            "Extracting restorative moments and recurring tension patterns..."
+            "Gemini is extracting restorative moments and recurring tension patterns..."
         }
         onProgress(64, stage3Title, stage3Detail)
-        delay(480L)
+        delay(380L)
 
         // Stage 4 (84%): Weekday rhythm & tags
         val stage4Title = if (lang == AppLanguage.RU) {
-            "Этап 4 из 5 • Анализ ритма недели и #тегов"
+            "Этап 4 из 5 • Синтез ответа Gemini 3.8 Flash"
         } else {
-            "Step 4 of 5 • Mapping weekday rhythm & tags"
+            "Step 4 of 5 • Synthesizing Gemini 3.8 Flash response"
         }
         val stage4Detail = if (lang == AppLanguage.RU) {
             if (topTags.isNotEmpty()) {
-                "Сопоставляем дни недели и ключевые темы: ${topTags.take(3).joinToString(", ")}"
+                "Сопоставляем ритм записей и ключевые темы: ${topTags.take(3).joinToString(", ")}"
             } else {
-                "Распределяем динамику настроения с понедельника по воскресенье..."
+                "Формируем персональный психологический отклик по вашим записям..."
             }
         } else {
-            "Correlating Monday–Sunday emotional intensity and tags..."
+            "Correlating emotional intensity, themes, and personal reflections..."
         }
         onProgress(84, stage4Title, stage4Detail)
 
-        // Wait up to ~7.5s more for real Gemini cloud response while ticking progress smoothly (84% -> 94%);
-        // if cloudDeferred finishes or fails earlier, exit loop immediately without extra waiting.
-        if (cloudDeferred != null) {
+        // Wait up to the full 60s timeout window for real Gemini cloud response while ticking progress smoothly (85% -> 95%)
+        val cloudJson = if (cloudDeferred != null) {
             var tickPercent = 85
             var waitedMs = 0L
-            while (cloudDeferred.isActive && waitedMs < 7200L) {
+            while (cloudDeferred.isActive && waitedMs < 58_000L) {
                 delay(450L)
                 waitedMs += 450L
-                if (tickPercent < 94) {
+                if (tickPercent < 95 && waitedMs % 900L == 0L) {
                     onProgress(tickPercent, stage4Title, stage4Detail)
                     tickPercent += 1
                 }
             }
-        }
-        val cloudJson = if (cloudDeferred != null && cloudDeferred.isCompleted) {
-            withTimeoutOrNull(200L) { cloudDeferred.await() }
+            try {
+                cloudDeferred.await()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Awaiting Gemini response failed", e)
+                null
+            }
         } else {
             null
         }
@@ -554,7 +653,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             "Composing personal letter, quiet wins, and gentle practices..."
         }
         onProgress(96, stage5Title, stage5Detail)
-        delay(280L)
+        delay(220L)
 
         return try {
             val report = if (!cloudJson.isNullOrBlank()) {
@@ -570,7 +669,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                         lang = lang
                     )
                 } catch (e: Exception) {
-                    Log.w(TAG, "Cloud JSON parse fallback to deep synthesis", e)
+                    Log.e(TAG, "Failed to parse Gemini JSON response, falling back to synthesis", e)
                     buildDeepPersonalizedReport(
                         period = period,
                         entries = effectiveEntries,
@@ -627,6 +726,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     ): AiPsychologicalReport {
         val periodTitle = period.localizedTitle(lang)
         val isYearly = period.periodType == AnalysisPeriodType.YEARLY_REVIEW
+        val isDaily = period.periodType == AnalysisPeriodType.DAILY
 
         if (entries.isEmpty()) {
             return buildStarterReportWhenNoEntries(period, weekdayBreakdown, lang)
@@ -680,28 +780,28 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 sampleTitles.isNotEmpty() ->
                     "Читая твои записи (${sampleTitles.joinToString(", ") { "«$it»" }}), особенно чувствуется, насколько внимательно и честно ты относишься к своему внутреннему миру."
                 !latestQuote.isNullOrBlank() ->
-                    "Вчитываясь в твои строки («$latestQuote»), очень ясно ощущается твоя искренность и бережное внимание к деталям каждого дня."
+                    "Вчитываясь в твои строки («$latestQuote»), очень ясно ощущается твоя искренность и бережное внимание к деталям дня."
                 else ->
-                    "Перечитывая твои записи за этот период, очень ясно чувствуется твоя искренность и бережное внимание к деталям каждого дня."
+                    "Перечитывая твои записи за «$periodTitle», очень ясно чувствуется твоя искренность и бережное внимание к своему состоянию."
             }
 
             val warmLetter = buildString {
-                append("Здравствуй. Я внимательно изучил твои записи за период «$periodTitle» (проанализировано записей: ${entries.size}). ")
+                append("Здравствуй. Я внимательно изучил твои записи за «$periodTitle» (проанализировано записей: ${entries.size}). ")
                 append(titlesMention)
                 append("\n\n")
-                append("Основным эмоциональным фоном этого времени стало состояние «${dominantMood.titleRu}» (${dominantMood.subtitleRu.lowercase()}), а средняя интенсивность и наполненность дней составила ${String.format("%.1f", avgIntensity)} из 5. ")
+                append("Основным эмоциональным фоном стало состояние «${dominantMood.titleRu}» (${dominantMood.subtitleRu.lowercase()}), а средняя интенсивность и наполненность составила ${String.format("%.1f", avgIntensity)} из 5. ")
                 if (brightEntries.isNotEmpty() && heavyEntries.isNotEmpty()) {
-                    append("В твоём дневнике живые, светлые дни соседствовали с моментами усталости — и это абсолютно естественный ритм живого человека, который не прячет эмоции, а проживает их осознанно.")
+                    append("В твоём дневнике живые, светлые моменты соседствовали с эпизодами усталости — и это абсолютно естественный ритм живого человека, который не прячет эмоции, а проживает их осознанно.")
                 } else if (brightEntries.isNotEmpty()) {
-                    append("В этот период тебе удалось сохранить удивительно тёплый контакт с собой и замечать то, что даёт тебе энергию и радость.")
+                    append("Тебе удалось сохранить удивительно тёплый контакт с собой и замечать то, что даёт тебе энергию и радость.")
                 } else {
-                    append("Этот период потребовал от тебя немало внутренних сил и терпения. Самое ценное — ты не оставил(а) переживания внутри, а доверил(а) их страницам дневника, разгрузив психику.")
+                    append("Это время потребовало от тебя немало внутренних сил и терпения. Самое ценное — ты не оставил(а) переживания внутри, а доверил(а) их страницам дневника, разгрузив психику.")
                 }
                 append("\n\n")
-                if (isYearly) {
-                    append("Оглядываясь на весь этот большой этап, важно сказать себе спасибо: за каждую честную строчку, за способность восстанавливаться после непростых дней и за ту внутреннюю зрелость, которая звучит в твоих размышлениях.")
-                } else {
-                    append("Поблагодари себя за эту паузу. Привычка замечать свои чувства — это один из самых надёжных способов сохранять душевную ясность и не выгорать.")
+                when {
+                    isYearly -> append("Оглядываясь на весь этот большой этап, важно сказать себе спасибо: за каждую честную строчку, за способность восстанавливаться после непростых дней и за ту внутреннюю зрелость, которая звучит в твоих размышлениях.")
+                    isDaily -> append("Поблагодари себя за то, что нашёл(ла) время остановиться сегодня и услышать себя. Даже одна искренняя запись делает вечер спокойнее и яснее.")
+                    else -> append("Поблагодари себя за эту паузу. Привычка замечать свои чувства — это один из самых надёжных способов сохранять душевную ясность и не выгорать.")
                 }
             }
 
@@ -709,11 +809,11 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 entries.size == 1 -> {
                     val only = entries.first()
                     val dateFormatted = DateAndPhotoUtils.formatShortDate(only.dateIso, lang)
-                    "За этот период сделана ключевая запись от $dateFormatted в состоянии «${dominantMood.titleRu}» (интенсивность ${only.moodIntensity}/5). Это важная точка отсчёта для наблюдения за дальнейшей динамикой настроения."
+                    "За $dateFormatted зафиксирована запись в состоянии «${dominantMood.titleRu}» (интенсивность ${only.moodIntensity}/5). Это важная точка опоры и самонаблюдения."
                 }
-                delta >= 0.4f -> "Заметна восходящая динамика: если в начале периода средний тонус составлял ${String.format("%.1f", firstAvg)}/5, то ближе к концу он вырос до ${String.format("%.1f", secondAvg)}/5. Внутреннее напряжение постепенно уступило место большей ясности и устойчивости."
+                delta >= 0.4f -> "Заметна восходящая динамика: если в начале средний тонус составлял ${String.format("%.1f", firstAvg)}/5, то ближе к концу он вырос до ${String.format("%.1f", secondAvg)}/5. Внутреннее напряжение постепенно уступило место большей ясности и устойчивости."
                 delta <= -0.4f -> "К концу периода заметно накопление усталости: интенсивность сместилась с ${String.format("%.1f", firstAvg)}/5 в начале до ${String.format("%.1f", secondAvg)}/5 в последних записях. Это мягкий сигнал организма о том, что сейчас важно замедлиться и восполнить ресурс."
-                else -> "Твой эмоциональный фон оставался ровным и стабильным на протяжении всего периода (около ${String.format("%.1f", avgIntensity)}/5) с преобладанием состояния «${dominantMood.titleRu}»."
+                else -> "Твой эмоциональный фон оставался ровным и стабильным (около ${String.format("%.1f", avgIntensity)}/5) с преобладанием состояния «${dominantMood.titleRu}»."
             }
 
             val energySources = buildList {
@@ -723,7 +823,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                     add("Светлые состояния, зафиксированные в твоих строках: «$brightQuote».")
                 }
                 if (cleanestTags.isNotEmpty()) {
-                    add("Твои ключевые ресурсные якоря и темы периода: ${cleanestTags.take(4).joinToString(", ")}.")
+                    add("Твои ключевые ресурсные якоря и темы: ${cleanestTags.take(4).joinToString(", ")}.")
                 }
                 if (allTextLower.contains("прогул") || allTextLower.contains("природ") || allTextLower.contains("воздух") || allTextLower.contains("улиц") || allTextLower.contains("парк")) {
                     add("Смена обстановки, прогулки и контакт с окружающим миром заметно возвращают тебе ощущение простора и спокойствия.")
@@ -731,7 +831,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 if (allTextLower.contains("друз") || allTextLower.contains("сем") || allTextLower.contains("близк") || allTextLower.contains("разговор") || allTextLower.contains("тепл") || allTextLower.contains("дом") || allTextLower.contains("уют")) {
                     add("Тёплый контакт с близкими людьми и атмосфера домашнего уюта работают как главная эмоциональная опора.")
                 }
-                add("Сама практика выгрузки мыслей в дневник: в дни, когда ты формулируешь чувства словами, внутренний фон становится структурнее и спокойнее.")
+                add("Сама практика выгрузки мыслей в дневник: когда ты формулируешь чувства словами, внутренний фон становится структурнее и спокойнее.")
             }.take(4)
 
             val stressTriggers = buildList {
@@ -746,7 +846,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 if (allTextLower.contains("сон") || allTextLower.contains("спал") || allTextLower.contains("ноч") || allTextLower.contains("утро") || allTextLower.contains("не высп")) {
                     add("Чувствительность эмоционального фона к режиму сна и физическому восстановлению.")
                 }
-                if (hardestDay != null && hardestDay.entriesCount > 0) {
+                if (hardestDay != null && hardestDay.entriesCount > 0 && !isDaily) {
                     add("В ритме недели наибольшее снижение тонуса приходится на ${hardestDay.fullNameRu.lowercase()} (средний балл ${String.format("%.1f", hardestDay.averageIntensity)}/5) — в этот день ресурс тратится быстрее обычного.")
                 } else {
                     add("Внутреннее ожидание от себя быстрых результатов и фоновое информационное напряжение.")
@@ -756,7 +856,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             val cognitivePatterns = listOf(
                 "Высокая рефлексивность: ты умеешь не просто фиксировать события, но и искать их внутренний смысл, замечая оттенки своего состояния.",
                 if (heavyEntries.size > brightEntries.size) {
-                    "Склонность брать на себя большую внутреннюю ответственность: в сложные дни внутренний критик может звучать громче, чем голос самоподдержки."
+                    "Склонность брать на себя большую внутреннюю ответственность: в сложные моменты внутренний критик может звучать громче, чем голос самоподдержки."
                 } else {
                     "Способность к эмоциональной саморегуляции: даже после напряжённых моментов ты находишь точки опоры через внимание к простым радостям и важным деталям."
                 },
@@ -764,7 +864,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             )
 
             val quietWins = buildList {
-                add("Регулярность самонаблюдения: сохранено записей — ${entries.size}, и каждая из них стала вкладом в твоё психологическое равновесие.")
+                add("Осознанное внимание к себе: сохранено записей — ${entries.size}, и каждая из них стала вкладом в твоё психологическое равновесие.")
                 if (brightEntries.isNotEmpty()) {
                     add("Умение бережно сохранять светлые моменты (${brightEntries.size} из ${entries.size} записей наполнены теплом, покоем или вдохновением).")
                 }
@@ -776,10 +876,10 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
             val weekdayInsight = buildString {
                 if (activeDay != null) {
-                    append("Чаще всего ты обращаешься к дневнику в ${activeDay.fullNameRu.lowercase()} (записей: ${activeDay.entriesCount}). ")
+                    append("Активнее всего записи велись в ${activeDay.fullNameRu.lowercase()} (записей: ${activeDay.entriesCount}). ")
                 }
                 if (calmestDay != null) {
-                    append("Самый гармоничный и ресурсный день недели по твоим отметкам — ${calmestDay.fullNameRu.lowercase()} (средняя интенсивность ${String.format("%.1f", calmestDay.averageIntensity)}/5). ")
+                    append("Самый гармоничный и ресурсный день по твоим отметкам — ${calmestDay.fullNameRu.lowercase()} (средняя интенсивность ${String.format("%.1f", calmestDay.averageIntensity)}/5). ")
                 }
                 if (cleanestTags.isNotEmpty()) {
                     append("Теги ${cleanestTags.take(4).joinToString(", ")} показывают главные темы, вокруг которых строился твой эмоциональный фокус.")
@@ -789,9 +889,9 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             }
 
             val adviceList = listOf(
-                "Практика «Тёплый якорь»: раз в неделю перечитывай одну свою запись в состоянии «Ясность и покой» или «Уют и тепло», чтобы возвращать телу память о безопасности и опоре.",
+                "Практика «Тёплый якорь»: перечитывай одну свою запись в состоянии «Ясность и покой» или «Уют и тепло», чтобы возвращать телу память о безопасности и опоре.",
                 "Бережный буфер отдыха: в дни, когда интенсивность настроения опускается до 2–3 баллов, сознательно убирай из списка дел хотя бы одну необязательную задачу.",
-                "Вопрос для следующей записи в дневнике: «Что прямо сейчас даёт мне чувство устойчивости, и как я могу подарить себе на 15 минут больше тишины на этой неделе?»"
+                "Вопрос для следующей записи в дневнике: «Что сегодня дало мне больше всего тишины внутри, и как я могу подарить себе ещё 15 минут этого состояния завтра?»"
             )
 
             AiPsychologicalReport(
@@ -895,8 +995,8 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 periodType = period.periodType.id,
                 periodTitle = periodTitle,
                 emotionalHeadline = "Начало бережного диалога с собой",
-                warmLetter = "Здравствуй! Это твой личный психологический уголок за период «$periodTitle». Как только ты начнёшь оставлять записи в дневнике — даже по паре предложений о том, что тебя порадовало, утомило или вдохновило — здесь будет формироваться глубокий разбор твоего состояния.\n\nДневник не требует идеальных текстов: достаточно честно выбрать карточку настроения, отметить уровень энергии и записать главную мысль дня. Уже после первых записей ты увидишь здесь свои источники ресурса, триггеры усталости и индивидуальный ритм недели.",
-                emotionalArcSummary = "Сейчас твой лист чист и открыт для новых наблюдений. Сделай первую запись на главном экране, а затем нажми «Обновить разбор», чтобы увидеть персональную динамику.",
+                warmLetter = "Здравствуй! Это твой личный психологический уголок с Gemini AI за период «$periodTitle». Как только ты оставишь запись в дневнике за этот период — даже пару предложений о том, что тебя порадовало, утомило или вдохновило — Gemini сформирует здесь глубокий разбор твоего состояния.\n\nДневник не требует идеальных текстов: достаточно честно выбрать карточку настроения, отметить уровень энергии и записать главную мысль дня. Уже после первой записи ты увидишь здесь свои источники ресурса, триггеры усталости и персональные рекомендации.",
+                emotionalArcSummary = "Сейчас за период «$periodTitle» пока нет записей. Сделай запись в дневнике, а затем нажми «Проанализировать состояние», чтобы получить разбор от Gemini AI.",
                 energySources = listOf(
                     "Осознанные паузы в течение дня, когда ты останавливаешься и спрашиваешь себя: «Как я себя сейчас чувствую?»",
                     "Тёплые мелочи: прогулка, спокойное утро, любимая музыка или разговор с близким человеком."
@@ -913,7 +1013,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 ),
                 weekdayAndTagInsights = "Добавляй к записям #теги (например, #работа, #сон, #прогулка, #семья), чтобы видеть, какие сферы жизни наполняют тебя силами в разные дни недели.",
                 gentleAdviceAndQuestions = listOf(
-                    "Начни с малого: сегодня вечером напиши всего 2–3 строчки о том, какой момент дня был самым спокойным.",
+                    "Начни с малого: сегодня напиши всего 2–3 строчки о том, какой момент дня был самым спокойным.",
                     "Вопрос для первой записи: «Что бы мне хотелось отпустить сегодня, а за что — поблагодарить этот день?»"
                 ),
                 entriesCount = 0,
@@ -929,8 +1029,8 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                 periodType = period.periodType.id,
                 periodTitle = periodTitle,
                 emotionalHeadline = "Beginning Your Mindful Journey",
-                warmLetter = "Welcome to your personal psychological reflection space for $periodTitle. As you write entries in your journal — even a few honest lines about your mood, energy, and daily moments — this space will weave them into an in-depth portrait of your emotional wellbeing.",
-                emotionalArcSummary = "Write your first journal entry and tap 'Refresh Analysis' to see how your mood and energy evolve over time.",
+                warmLetter = "Welcome to your personal Gemini AI psychological reflection space for $periodTitle. As you write entries in your journal — even a few honest lines about your mood, energy, and daily moments — Gemini will weave them into an in-depth portrait of your emotional wellbeing.",
+                emotionalArcSummary = "Write a journal entry for $periodTitle and tap 'Analyze My State' to receive your personalized Gemini AI insight.",
                 energySources = listOf(
                     "Taking a quiet moment to check in with your feelings without judgment.",
                     "Small daily rituals that bring calm and warmth."
@@ -975,6 +1075,16 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         }
 
         val periodContext = when (period.periodType) {
+            AnalysisPeriodType.DAILY -> if (lang == AppLanguage.RU) {
+                "Это ГЛУБОКИЙ ПСИХОЛОГИЧЕСКИЙ РАЗБОР ЗА ДЕНЬ («${period.localizedTitle(lang)}»). Внимательно разбери сегодняшние/дневные записи автора, его эмоции, мысли, ответы на вопросы рефлексии, скрытые переживания и точки опоры этого конкретного дня."
+            } else {
+                "This is an in-depth DAILY PSYCHOLOGICAL REFLECTION for '${period.localizedTitle(lang)}'. Carefully analyze the user's personal entries for this specific day, their emotions, thoughts, reflection answers, and daily anchors."
+            }
+            AnalysisPeriodType.WEEKLY -> if (lang == AppLanguage.RU) {
+                "Это психологический разбор за ПОСЛЕДНИЕ 7 ДНЕЙ (недельный срез состояния)."
+            } else {
+                "This is a WEEKLY psychological analysis of the LAST 7 DAYS."
+            }
             AnalysisPeriodType.YEARLY_REVIEW -> if (lang == AppLanguage.RU) {
                 "Это БОЛЬШОЙ ГОДОВОЙ ОТЧЁТ (Итоги года / Декабрьская ретроспектива) за период «${period.localizedTitle(lang)}». Проанализируй глобальную эволюцию состояния человека за год, его главные опоры, преодоления и личностный рост."
             } else {
@@ -1078,7 +1188,8 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             dominantMoodKey = dominantMoodKey,
             topTags = topTags,
             weekdayBreakdown = weekdayBreakdown,
-            createdAtMillis = System.currentTimeMillis()
+            createdAtMillis = System.currentTimeMillis(),
+            aiModelBadge = "Gemini 3.8 Flash • Firebase AI Logic"
         )
     }
 
@@ -1133,6 +1244,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         obj.put("dominantMoodKey", report.dominantMoodKey)
         obj.put("topTags", JSONArray(report.topTags))
         obj.put("createdAtMillis", report.createdAtMillis)
+        obj.put("aiModelBadge", report.aiModelBadge)
 
         val weekdaysArr = JSONArray()
         report.weekdayBreakdown.forEach { wd ->
@@ -1190,7 +1302,8 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             dominantMoodKey = obj.optString("dominantMoodKey", BotanicalMood.CALM_LEAF.key),
             topTags = parseJsonStringArray(obj.optJSONArray("topTags")),
             weekdayBreakdown = weekdays,
-            createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis())
+            createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
+            aiModelBadge = obj.optString("aiModelBadge", "Gemini 3.8 Flash • Firebase AI Logic")
         )
     }
 

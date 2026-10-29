@@ -145,12 +145,12 @@ fun EndOfPeriodAiBanner(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isYearly) {
-                            tr("DECEMBER YEAR IN REVIEW • AI PSYCHOLOGIST", "ИТОГИ ГОДА В ДЕКАБРЕ • ИИ-ПСИХОЛОГ")
-                        } else if (period.isEndOfPeriodHighlight) {
-                            tr("END OF MONTH • PSYCHOLOGICAL REVIEW", "ИТОГИ МЕСЯЦА • ИИ-ПСИХОЛОГ")
-                        } else {
-                            tr("PSYCHOLOGICAL STATE ANALYSIS", "ПСИХОЛОГИЧЕСКИЙ РАЗБОР СОСТОЯНИЯ")
+                        text = when {
+                            isYearly -> tr("DECEMBER YEAR IN REVIEW • GEMINI AI", "ИТОГИ ГОДА В ДЕКАБРЕ • GEMINI AI")
+                            period.periodType == AnalysisPeriodType.DAILY -> tr("DAILY REFLECTION • GEMINI AI", "РАЗБОР ЗА ДЕНЬ • GEMINI AI")
+                            period.periodType == AnalysisPeriodType.WEEKLY -> tr("WEEKLY CHECK-IN • GEMINI AI", "РАЗБОР ЗА 7 ДНЕЙ • GEMINI AI")
+                            period.isEndOfPeriodHighlight -> tr("END OF MONTH • GEMINI AI REVIEW", "ИТОГИ МЕСЯЦА • GEMINI AI")
+                            else -> tr("PSYCHOLOGICAL ANALYSIS • GEMINI AI", "ПСИХОЛОГИЧЕСКИЙ РАЗБОР • GEMINI AI")
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = NunitoFontFamily,
@@ -323,7 +323,7 @@ fun AiPsychologicalHubSection(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = tr("AI PSYCHOLOGIST • STATE & MOOD PORTRAIT", "ИИ-ПСИХОЛОГ • РАЗБОР СОСТОЯНИЯ"),
+                            text = tr("GEMINI AI PSYCHOLOGIST • FIREBASE AI LOGIC", "ИИ-ПСИХОЛОГ GEMINI • FIREBASE AI LOGIC"),
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = NunitoFontFamily,
                             fontWeight = FontWeight.Bold,
@@ -331,8 +331,8 @@ fun AiPsychologicalHubSection(
                         )
                         Text(
                             text = tr(
-                                "Deep Analysis of Mood & State",
-                                "Глубокий анализ состояния и эмоций"
+                                "Analysis for Day, Week, Month & Year",
+                                "Анализ записей за день, неделю, месяц и год"
                             ),
                             style = MaterialTheme.typography.titleMedium,
                             fontFamily = NunitoFontFamily,
@@ -344,23 +344,25 @@ fun AiPsychologicalHubSection(
 
                 Text(
                     text = tr(
-                        "Select a month, the last 30 days, or your Year in Review (December special). Your personal AI psychologist analyzes your emotional rhythm, stress triggers, energy anchors, thinking patterns, and hidden wins.",
-                        "Выберите итоги месяца, срез за 30 дней или большой годовой отчёт (особенно в декабре). Умный алгоритм проанализирует ваше настроение, триггеры стресса, источники ресурса, паттерны мышления и скрытые победы."
+                        "Choose any single day, 7 days, a month, 30 days, or your Year in Review. Gemini 3.8 Flash (via Firebase AI Logic) analyzes your personal entries, emotional rhythm, stress triggers, energy anchors, and hidden wins.",
+                        "Выберите разбор за конкретный день, за 7 дней, итоги месяца, срез за 30 дней или годовой отчёт. Gemini 3.8 Flash (через Firebase AI Logic) анализирует ваши личные записи, триггеры стресса, источники сил и паттерны мышления."
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Category Mode Switcher (Monthly | Last 30 Days | Yearly Review)
+                // Category Mode Switcher (Daily | 7 Days | Monthly | Last 30 Days | Yearly Review)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     val modes = listOf(
-                        AnalysisPeriodType.MONTHLY to tr("Monthly Summary", "Итоги месяца"),
+                        AnalysisPeriodType.DAILY to tr("Daily", "За день"),
+                        AnalysisPeriodType.WEEKLY to tr("7 Days", "За 7 дней"),
+                        AnalysisPeriodType.MONTHLY to tr("Monthly", "За месяц"),
                         AnalysisPeriodType.LAST_30_DAYS to tr("Last 30 Days", "За 30 дней"),
-                        AnalysisPeriodType.YEARLY_REVIEW to tr("Year in Review (Dec)", "Итоги года (Декабрь)")
+                        AnalysisPeriodType.YEARLY_REVIEW to tr("Year in Review", "Итоги года")
                     )
                     modes.forEach { (mode, label) ->
                         val selected = selectedCategory == mode
@@ -739,6 +741,31 @@ private fun PsychologicalReportContent(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = report.aiModelBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
 
