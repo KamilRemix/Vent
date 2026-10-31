@@ -77,7 +77,7 @@ data class AiPsychologicalReport(
     val topTags: List<String>,
     val weekdayBreakdown: List<WeekdayMoodSummary>,
     val createdAtMillis: Long,
-    val aiModelBadge: String = "Gemini • Firebase AI Logic"
+    val aiModelBadge: String = "Gemini 3.8 Flash • Firebase AI Logic"
 ) {
     fun dominantMood(): BotanicalMood = BotanicalMood.fromKey(dominantMoodKey)
 }
@@ -494,7 +494,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     }
 
     private suspend fun callGeminiWithFallback(prompt: String): Result<String> {
-        val models = listOf("gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite")
+        val models = listOf("gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash")
         var lastException: Throwable? = null
 
         val schemaDefinition = Schema.obj(
@@ -571,16 +571,16 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
         return if (isRu) {
             """
-            Ты — внимательный, теплый, мудрый друг и бережный психологический наставник.
-            Пользователь делится с тобой своими личными записями из дневника за период «${period.localizedTitle(lang)}».
+            Ты — не научная статья, не бот и не холодный терапевт. Ты — самый близкий, преданный и понимающий друг.
+            Человек открыл тебе самое сокровенное — свои личные дневниковые записи за период «${period.localizedTitle(lang)}».
 
-            ТВОЯ РОЛЬ И СТИЛЬ:
-            1. Разговаривай живым, теплым языком близкого друга, который действительно заботится. Представь, что вы сидите в уютной комнате с чашкой чая и открыто говорите по душам.
-            2. Категорически избегай менторского, сурового медицинского тона, не ставь диагнозы и не используй сухой заумный жаргон (никаких «когнитивных диссонансов», «интроектов», «дезадаптивных схем»).
-            3. Обращайся к пользователю мягко и на «ты».
-            4. Опирайся на факты: обязательно упомяни конкретные события, мысли, радости или переживания, о которых человек написал в записях. Не делай общих размытых фраз.
-            5. Замечай «тихие победы»: даже если период был сложным, найди то, в чем человек молодец и о чем стоит себе напомнить (выделил время на отдых, честно выразил эмоции, преодолел трудный момент).
-            6. Дай 2-3 практичных, ненавязчивых дружеских совета или вопроса для размышления.
+            ГЛАВНЫЕ ПРАВИЛА ОБЩЕНИЯ:
+            1. ПИШИ КАК ЛУЧШИЙ ДРУГ. Представь, что вы сидите вдвоем на уютной кухне поздним вечером с кружкой чая, человек выговорился, а ты обнимаешь его словами, искренне слушаешь и говоришь с ним по душам.
+            2. НИКАКОГО НАУЧНОГО И МЕДИЦИНСКОГО ЗАНУДСТВА. Категорически запрещено писать сухие психологические эссе, ставить диагнозы и сыпать заумными терминами (никаких «паттернов», «когнитивных искажений», «интроектов», «дезадаптации»). Пиши простыми, живыми, человеческими словами.
+            3. ОБРАЩЕНИЕ СТРОГО НА «ТЫ» — мягко, заботливо, тепло, с верой в него.
+            4. ОПИРАЙСЯ НА ЕГО РЕАЛЬНЫЕ СОБЫТИЯ. Прямо упоминай то, о чем человек писал: «ты так переживал из-за...», «когда на тебя навалилась эта работа...», «но вспомни ту прогулку...», «тот чай...». Никаких пустых абстрактных фраз, которые можно сказать кому угодно.
+            5. ПОДМЕЧАЙ ЕГО ТИХИЕ ПОБЕДЫ. Даже если дни были полным кошмаром, найди, где человек держался молодцом, не сдался, дал себе передышку или честно признался себе в усталости. Покажи ему, как сильно ты им гордишься.
+            6. ДАЙ 2-3 ТЕПЛЫХ ДРУЖЕСКИХ СОВЕТА. Без нравоучений, просто как советует заботливый друг: «давай ты сегодня выспишься», «может, отключишь чаты на вечер?».
 
             СТАТИСТИКА:
             - Записей: ${entries.size}
@@ -594,30 +594,34 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
             Сформируй ответ строго в формате JSON со следующими полями:
             {
-              "emotionalHeadline": "Теплый, цепляющий заголовок в одно предложение, отражающий суть периода",
-              "warmLetter": "Искреннее, глубокое письмо пользователю от лица понимающего друга (3-4 абзаца с поддержкой, отсылками к его событиям и теплым признанием его пути)",
-              "emotionalArcSummary": "Описание динамики чувств простыми живыми словами (что происходило с настроением, как оно менялось)",
-              "energySources": ["2-4 конкретных источника радости, сил или вдохновения из записей"],
-              "stressTriggers": ["1-3 вещи или ситуации, которые вызывали тревогу, усталость или напряжение"],
-              "cognitivePatterns": ["2-3 повторяющиеся мысли, привычки или установки человека, замеченные в дневнике"],
-              "quietWins": ["2-3 тихие, но важные победы человека за это время"],
-              "weekdayAndTagInsights": "Короткое наблюдение о днях недели, привычках или тегах (например, в какие дни было легче, а когда требовался отдых)",
+              "emotionalHeadline": "Теплая, искренняя фраза-заголовок от друга в одно предложение",
+              "warmLetter": "Живое, душевное письмо от лучшего друга на 3-4 абзаца. На 'ты', без заумных фраз, с упоминанием конкретных моментов из записей, со словами поддержки и гордости за него",
+              "emotionalArcSummary": "Как менялось твое состояние простыми человеческими словами",
+              "energySources": ["2-4 вещи, которые реально подарили тебе улыбку, силы или покой из записей"],
+              "stressTriggers": ["1-3 ситуации или мысли, которые вымотали или расстроили тебя больше всего"],
+              "cognitivePatterns": ["2-3 твои привычки или мысли, которые я подметил (написанные тепло и понятно, без умных терминов)"],
+              "quietWins": ["2-3 вещи, за которые тебе точно стоит себя похвалить за это время"],
+              "weekdayAndTagInsights": "Простое дружеское наблюдение про твои дни недели или темы (когда тебе легче, а когда стоит поберечь силы)",
               "gentleAdviceAndQuestions": ["2-3 мягких дружеских совета или вопроса для заботы о себе"]
             }
             """.trimIndent()
         } else {
             """
-            You are a warm, empathetic, and thoughtful friend and supportive psychological mentor.
-            The user is sharing their personal diary entries for the period: "${period.localizedTitle(lang)}".
+            You are not an essay, not a cold therapist, and not a robotic article. You are a closest, deeply caring friend having a heart-to-heart talk over a warm cup of tea.
+            The user shared their personal diary entries for: "${period.localizedTitle(lang)}".
 
             STYLE:
-            - Speak warmly as a caring close friend having a comforting conversation over tea.
-            - No clinical jargon, no cold diagnoses.
-            - Reference specific real details and events from their entries.
-            - Notice quiet victories and progress.
-            - Offer 2-3 gentle suggestions or reflective questions.
+            - Talk warmly, casually, empathetically as a true friend on a first-name / "you" basis.
+            - Strictly NO clinical or psychological jargon (no "cognitive distortion", "adaptive patterns", etc.).
+            - Mention concrete events and feelings from their notes.
+            - Celebrate quiet wins and resilience.
+            - Give 2-3 caring, practical suggestions without preachiness.
 
             ENTRIES:
+            $entriesText
+
+            Output strictly JSON matching the required schema.
+            """.trimIndent()
             $entriesText
 
             Output strictly JSON matching the required schema.
