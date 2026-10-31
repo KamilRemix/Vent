@@ -622,10 +622,6 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
             Output strictly JSON matching the required schema.
             """.trimIndent()
-            $entriesText
-
-            Output strictly JSON matching the required schema.
-            """.trimIndent()
         }
     }
 
@@ -769,7 +765,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             topTags = jsonArrayToList(obj.optJSONArray("topTags")),
             weekdayBreakdown = weekdays,
             createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
-            aiModelBadge = obj.optString("aiModelBadge", "Gemini • Firebase AI Logic")
+            aiModelBadge = obj.optString("aiModelBadge", "Gemini 3.8 Flash • Firebase AI Logic")
         )
     }
 }
