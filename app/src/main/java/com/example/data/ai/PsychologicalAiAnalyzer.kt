@@ -11,12 +11,12 @@ import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.Schema
 import com.google.firebase.ai.type.generationConfig
 import java.util.Calendar
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -128,54 +128,57 @@ object PeriodInsightDetector {
         val currentYear = cal.get(Calendar.YEAR)
         val currentMonthZero = cal.get(Calendar.MONTH) // 0..11
         val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
-        val currentYearMonth = String.format("%04d-%02d", currentYear, currentMonthZero + 1)
+        val currentYearMonth = String.format(Locale.US, "%04d-%02d", currentYear, currentMonthZero + 1)
 
         val result = mutableListOf<AvailableAnalysisPeriod>()
 
-        // 1. Daily option for today
+        // 0. DAILY Periods: Today
+        val todayShortEn = DateAndPhotoUtils.formatShortDate(todayIso, AppLanguage.EN)
+        val todayShortRu = DateAndPhotoUtils.formatShortDate(todayIso, AppLanguage.RU)
         val todayEntries = unlocked.filter { it.dateIso == todayIso }
-        val todayShortRu = "${cal.get(Calendar.DAY_OF_MONTH)} ${monthNamesRu[currentMonthZero].lowercase()}"
-        val todayShortEn = "${monthNamesEn[currentMonthZero]} ${cal.get(Calendar.DAY_OF_MONTH)}"
         result.add(
             AvailableAnalysisPeriod(
-                periodKey = "day_$todayIso",
+                periodKey = "DAY-$todayIso",
                 periodType = AnalysisPeriodType.DAILY,
                 titleEn = "Today ($todayShortEn)",
                 titleRu = "Сегодня ($todayShortRu)",
-                subtitleEn = "Gemini AI reflection on today's state",
-                subtitleRu = "Разбор состояния за день от Gemini AI",
+                subtitleEn = "Gemini AI reflection on today's personal entries",
+                subtitleRu = "Разбор состояния за сегодня от Gemini AI",
                 entriesCount = todayEntries.size,
-                isEndOfPeriodHighlight = true
+                isEndOfPeriodHighlight = todayEntries.isNotEmpty()
             )
         )
 
-        // 1b. Extra date option if clicked from calendar or entry
-        if (extraDateIso != null && extraDateIso != todayIso) {
-            val extraEntries = unlocked.filter { it.dateIso == extraDateIso }
-            val extraCal = DateAndPhotoUtils.parseIsoToCalendar(extraDateIso)
-            val extraMonth = extraCal.get(Calendar.MONTH)
-            val fullRu = "${extraCal.get(Calendar.DAY_OF_MONTH)} ${monthNamesRu[extraMonth].lowercase()} ${extraCal.get(Calendar.YEAR)}"
-            val fullEn = "${monthNamesEn[extraMonth]} ${extraCal.get(Calendar.DAY_OF_MONTH)}, ${extraCal.get(Calendar.YEAR)}"
-            val dayCount = extraEntries.size
+        // Additional daily entries (up to 30 recent days)
+        val recentDistinctDates = (unlocked.map { it.dateIso } + listOfNotNull(extraDateIso))
+            .filter { it != todayIso && it.matches(Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")) }
+            .distinct()
+            .sortedDescending()
+            .take(30)
+
+        recentDistinctDates.forEach { dIso ->
+            val shortEn = DateAndPhotoUtils.formatShortDate(dIso, AppLanguage.EN)
+            val shortRu = DateAndPhotoUtils.formatShortDate(dIso, AppLanguage.RU)
+            val dayCount = unlocked.count { it.dateIso == dIso }
             result.add(
                 AvailableAnalysisPeriod(
-                    periodKey = "day_$extraDateIso",
+                    periodKey = "DAY-$dIso",
                     periodType = AnalysisPeriodType.DAILY,
-                    titleEn = fullEn,
-                    titleRu = fullRu,
+                    titleEn = shortEn,
+                    titleRu = shortRu,
                     subtitleEn = "Day reflection ($dayCount entries)",
-                    subtitleRu = "Разбор за день ($fullRu, записей: $dayCount)",
+                    subtitleRu = "Разбор за день (записей: $dayCount)",
                     entriesCount = dayCount,
                     isEndOfPeriodHighlight = false
                 )
             )
         }
 
-        // 2. Weekly (Last 7 Days)
-        val sevenDaysEntries = filterEntriesForPeriod(unlocked, AnalysisPeriodType.WEEKLY, todayIso = todayIso)
+        // 1. Weekly (Last 7 Days)
+        val sevenDaysEntries = entriesForPeriod(unlocked, "LAST-7-DAYS", todayIso)
         result.add(
             AvailableAnalysisPeriod(
-                periodKey = "weekly_7d",
+                periodKey = "LAST-7-DAYS",
                 periodType = AnalysisPeriodType.WEEKLY,
                 titleEn = "Last 7 Days",
                 titleRu = "Последние 7 дней",
@@ -186,13 +189,13 @@ object PeriodInsightDetector {
             )
         )
 
-        // 3. Current Month
+        // 2. Current Month
         val currentMonthEntries = unlocked.filter { it.dateIso.startsWith(currentYearMonth) }
         val maxDaysInCurrentMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
         val isEndOfMonthNow = dayOfMonth >= (maxDaysInCurrentMonth - 2)
         result.add(
             AvailableAnalysisPeriod(
-                periodKey = "month_$currentYearMonth",
+                periodKey = currentYearMonth,
                 periodType = AnalysisPeriodType.MONTHLY,
                 titleEn = "${monthNamesEn[currentMonthZero]} $currentYear",
                 titleRu = "${monthNamesRu[currentMonthZero]} $currentYear",
@@ -203,11 +206,11 @@ object PeriodInsightDetector {
             )
         )
 
-        // 4. Last 30 Days rolling window
-        val thirtyDaysEntries = filterEntriesForPeriod(unlocked, AnalysisPeriodType.LAST_30_DAYS, todayIso = todayIso)
+        // 3. Last 30 Days rolling window
+        val thirtyDaysEntries = entriesForPeriod(unlocked, "LAST-30-DAYS", todayIso)
         result.add(
             AvailableAnalysisPeriod(
-                periodKey = "rolling_30d",
+                periodKey = "LAST-30-DAYS",
                 periodType = AnalysisPeriodType.LAST_30_DAYS,
                 titleEn = "Last 30 Days",
                 titleRu = "Последние 30 дней",
@@ -218,7 +221,7 @@ object PeriodInsightDetector {
             )
         )
 
-        // 5. Yearly / Year in Review
+        // 4. Yearly / Year in Review
         val yearsWithEntries = unlocked.mapNotNull {
             it.dateIso.take(4).toIntOrNull()
         }.toSet() + currentYear
@@ -229,7 +232,7 @@ object PeriodInsightDetector {
             if (countForYr > 0 || yr == currentYear) {
                 result.add(
                     AvailableAnalysisPeriod(
-                        periodKey = "year_$yr",
+                        periodKey = "$yr-YEAR",
                         periodType = AnalysisPeriodType.YEARLY_REVIEW,
                         titleEn = "Year $yr in Review",
                         titleRu = "Итоги $yr года",
@@ -245,45 +248,71 @@ object PeriodInsightDetector {
         return result
     }
 
-    fun filterEntriesForPeriod(
+    fun entriesForPeriod(
         allEntries: List<DiaryEntry>,
-        periodType: AnalysisPeriodType,
-        periodKey: String = "",
+        periodKey: String,
         todayIso: String = DateAndPhotoUtils.todayIso()
     ): List<DiaryEntry> {
         val unlocked = unlockedEntriesOnly(allEntries, todayIso)
-        return when (periodType) {
-            AnalysisPeriodType.DAILY -> {
-                val targetDate = if (periodKey.startsWith("day_")) periodKey.removePrefix("day_") else todayIso
-                unlocked.filter { it.dateIso == targetDate }
+        return when {
+            periodKey.startsWith("DAY-") -> {
+                val targetDateIso = periodKey.removePrefix("DAY-")
+                unlocked.filter { it.dateIso == targetDateIso }.sortedBy { it.dateIso }
             }
-            AnalysisPeriodType.WEEKLY -> {
+            periodKey == "LAST-7-DAYS" -> {
                 val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
-                val cutoff = Calendar.getInstance().apply {
-                    timeInMillis = cal.timeInMillis
-                    add(Calendar.DAY_OF_YEAR, -6)
-                }
-                val cutoffIso = DateAndPhotoUtils.formatCalendarToIso(cutoff)
-                unlocked.filter { it.dateIso in cutoffIso..todayIso }
+                cal.add(Calendar.DAY_OF_YEAR, -6)
+                val startIso = DateAndPhotoUtils.calendarToIso(cal)
+                unlocked.filter { it.dateIso in startIso..todayIso }.sortedBy { it.dateIso }
             }
-            AnalysisPeriodType.MONTHLY -> {
-                val ym = if (periodKey.startsWith("month_")) periodKey.removePrefix("month_") else todayIso.take(7)
-                unlocked.filter { it.dateIso.startsWith(ym) }
-            }
-            AnalysisPeriodType.LAST_30_DAYS -> {
+            periodKey == "LAST-30-DAYS" -> {
                 val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
-                val cutoff = Calendar.getInstance().apply {
-                    timeInMillis = cal.timeInMillis
-                    add(Calendar.DAY_OF_YEAR, -29)
-                }
-                val cutoffIso = DateAndPhotoUtils.formatCalendarToIso(cutoff)
-                unlocked.filter { it.dateIso in cutoffIso..todayIso }
+                cal.add(Calendar.DAY_OF_YEAR, -29)
+                val startIso = DateAndPhotoUtils.calendarToIso(cal)
+                unlocked.filter { it.dateIso in startIso..todayIso }.sortedBy { it.dateIso }
             }
-            AnalysisPeriodType.YEARLY_REVIEW -> {
-                val yr = if (periodKey.startsWith("year_")) periodKey.removePrefix("year_") else todayIso.take(4)
-                unlocked.filter { it.dateIso.startsWith(yr) }
+            periodKey.endsWith("-YEAR") -> {
+                val yr = periodKey.removeSuffix("-YEAR")
+                unlocked.filter { it.dateIso.startsWith(yr) }.sortedBy { it.dateIso }
             }
-        }.sortedBy { it.dateIso }
+            periodKey.matches(Regex("^[0-9]{4}-[0-9]{2}$")) -> {
+                unlocked.filter { it.dateIso.startsWith(periodKey) }.sortedBy { it.dateIso }
+            }
+            else -> unlocked.sortedBy { it.dateIso }
+        }
+    }
+
+    fun recommendedHomeBannerPeriod(
+        allEntries: List<DiaryEntry>,
+        savedReports: Map<String, AiPsychologicalReport>,
+        todayIso: String = DateAndPhotoUtils.todayIso()
+    ): AvailableAnalysisPeriod? {
+        val periods = buildAvailablePeriods(allEntries, todayIso)
+        val cal = DateAndPhotoUtils.parseIsoToCalendar(todayIso)
+        val monthZero = cal.get(Calendar.MONTH)
+        val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
+        val currentYear = cal.get(Calendar.YEAR)
+
+        // Priority 1: December Year in Review if entries exist
+        if (monthZero == Calendar.DECEMBER) {
+            val yearPeriod = periods.firstOrNull { it.periodKey == "$currentYear-YEAR" && it.entriesCount > 0 }
+            if (yearPeriod != null) return yearPeriod
+        }
+
+        // Priority 2: End of month (days 25..31)
+        val currentYearMonth = String.format(Locale.US, "%04d-%02d", currentYear, monthZero + 1)
+        val currentMonthPeriod = periods.firstOrNull { it.periodKey == currentYearMonth }
+        if (dayOfMonth >= 25 && currentMonthPeriod != null && currentMonthPeriod.entriesCount > 0) {
+            return currentMonthPeriod
+        }
+
+        // Priority 3: Sunday weekly review
+        if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+            val weekPeriod = periods.firstOrNull { it.periodKey == "LAST-7-DAYS" && it.entriesCount >= 3 }
+            if (weekPeriod != null) return weekPeriod
+        }
+
+        return null
     }
 
     fun computeWeekdayBreakdown(entries: List<DiaryEntry>): List<WeekdayMoodSummary> {
@@ -325,24 +354,58 @@ object PeriodInsightDetector {
     }
 }
 
-object PsychologicalAiAnalyzer {
-    private const val TAG = "PsychologicalAiAnalyzer"
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+class PsychologicalAiAnalyzer(private val context: Context) {
+    companion object {
+        private const val TAG = "PsychologicalAiAnalyzer"
+        private const val PREFS_NAME = "vent_ai_psychological_reports"
+        private const val KEY_REPORTS_PREFIX = "reports_user_"
+    }
 
-    suspend fun generateReport(
-        context: Context,
+    private val prefs by lazy {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    fun loadSavedReports(userId: String): Map<String, AiPsychologicalReport> {
+        val raw = prefs.getString("${KEY_REPORTS_PREFIX}$userId", null) ?: return emptyMap()
+        return try {
+            val root = JSONObject(raw)
+            val map = mutableMapOf<String, AiPsychologicalReport>()
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val item = root.optJSONObject(key) ?: continue
+                map[key] = deserializeCachedReport(item)
+            }
+            map
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read cached AI reports", e)
+            emptyMap()
+        }
+    }
+
+    fun saveReportToLocalCache(userId: String, report: AiPsychologicalReport) {
+        try {
+            val current = loadSavedReports(userId).toMutableMap()
+            current[report.periodKey] = report
+            val root = JSONObject()
+            current.forEach { (key, rep) ->
+                root.put(key, serializeReport(rep))
+            }
+            prefs.edit().putString("${KEY_REPORTS_PREFIX}$userId", root.toString()).apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cache AI report", e)
+        }
+    }
+
+    suspend fun analyzePeriod(
+        userId: String,
         period: AvailableAnalysisPeriod,
+        periodEntries: List<DiaryEntry>,
         allEntries: List<DiaryEntry>,
         lang: AppLanguage = AppLanguage.RU,
         onProgress: (Int, String, String) -> Unit = { _, _, _ -> }
     ): Result<AiPsychologicalReport> {
-        val effectiveEntries = PeriodInsightDetector.filterEntriesForPeriod(
-            allEntries = allEntries,
-            periodType = period.periodType,
-            periodKey = period.periodKey
-        )
-
-        if (effectiveEntries.isEmpty()) {
+        if (periodEntries.isEmpty()) {
             val emptyMsg = if (lang == AppLanguage.RU) {
                 "За выбранный период «${period.localizedTitle(lang)}» пока нет записей. Добавьте хотя бы одну запись в дневник, чтобы Gemini AI мог провести анализ."
             } else {
@@ -355,16 +418,16 @@ object PsychologicalAiAnalyzer {
         onProgress(
             15,
             if (lang == AppLanguage.RU) "Подготовка записей" else "Preparing entries",
-            if (lang == AppLanguage.RU) "Анализ ${effectiveEntries.size} записей дневника..." else "Processing ${effectiveEntries.size} entries..."
+            if (lang == AppLanguage.RU) "Анализ ${periodEntries.size} записей дневника..." else "Processing ${periodEntries.size} entries..."
         )
         delay(250)
 
         // Stage 2: Aggregation
-        val weekdayBreakdown = PeriodInsightDetector.computeWeekdayBreakdown(effectiveEntries)
-        val dominantMood = effectiveEntries.groupBy { it.mood }
+        val weekdayBreakdown = PeriodInsightDetector.computeWeekdayBreakdown(periodEntries)
+        val dominantMood = periodEntries.groupBy { it.mood }
             .maxByOrNull { it.value.size }?.key ?: BotanicalMood.BALANCE
-        val avgIntensity = effectiveEntries.map { it.moodIntensity }.average().toFloat()
-        val topTags = effectiveEntries.flatMap { it.tags }
+        val avgIntensity = periodEntries.map { it.moodIntensity }.average().toFloat()
+        val topTags = periodEntries.flatMap { it.tags }
             .groupBy { it }
             .entries.sortedByDescending { it.value.size }
             .take(6)
@@ -386,7 +449,7 @@ object PsychologicalAiAnalyzer {
 
         val prompt = buildPsychologistPrompt(
             period = period,
-            entries = effectiveEntries,
+            entries = periodEntries,
             dominantMood = dominantMood,
             avgIntensity = avgIntensity,
             topTags = topTags,
@@ -408,13 +471,14 @@ object PsychologicalAiAnalyzer {
             val parsed = parseGeminiResponse(
                 rawJson = rawJson,
                 period = period,
-                entriesCount = effectiveEntries.size,
+                entriesCount = periodEntries.size,
                 avgIntensity = avgIntensity,
                 dominantMoodKey = dominantMood.name,
                 topTags = topTags,
                 weekdayBreakdown = weekdayBreakdown,
                 lang = lang
             )
+            saveReportToLocalCache(userId, parsed)
             onProgress(100, if (lang == AppLanguage.RU) "Готово" else "Done", "")
             Result.success(parsed)
         } else {
@@ -503,7 +567,7 @@ object PsychologicalAiAnalyzer {
         }
 
         val weekdaySummary = weekdayBreakdown.filter { it.entriesCount > 0 }
-            .joinToString("; ") { "${it.fullLabel(lang)}: записей=${it.entriesCount}, ср.интенсивность=${String.format("%.1f", it.averageIntensity)}" }
+            .joinToString("; ") { "${it.fullLabel(lang)}: записей=${it.entriesCount}, ср.интенсивность=${String.format(Locale.US, "%.1f", it.averageIntensity)}" }
 
         return if (isRu) {
             """
@@ -521,7 +585,7 @@ object PsychologicalAiAnalyzer {
             СТАТИСТИКА:
             - Записей: ${entries.size}
             - Преобладающее состояние: ${dominantMood.titleRu} (${dominantMood.subtitleRu})
-            - Средняя интенсивность: ${String.format("%.1f", avgIntensity)} / 5.0
+            - Средняя интенсивность: ${String.format(Locale.US, "%.1f", avgIntensity)} / 5.0
             - Топ-теги: ${if (topTags.isNotEmpty()) topTags.joinToString(", ") else "нет тегов"}
             - Дни недели: $weekdaySummary
 
@@ -611,6 +675,97 @@ object PsychologicalAiAnalyzer {
             weekdayBreakdown = weekdayBreakdown,
             createdAtMillis = System.currentTimeMillis(),
             aiModelBadge = "Gemini • Firebase AI Logic"
+        )
+    }
+
+    private fun serializeReport(report: AiPsychologicalReport): JSONObject {
+        val obj = JSONObject()
+        obj.put("periodKey", report.periodKey)
+        obj.put("periodType", report.periodType)
+        obj.put("periodTitle", report.periodTitle)
+        obj.put("emotionalHeadline", report.emotionalHeadline)
+        obj.put("warmLetter", report.warmLetter)
+        obj.put("emotionalArcSummary", report.emotionalArcSummary)
+        obj.put("energySources", JSONArray(report.energySources))
+        obj.put("stressTriggers", JSONArray(report.stressTriggers))
+        obj.put("cognitivePatterns", JSONArray(report.cognitivePatterns))
+        obj.put("quietWins", JSONArray(report.quietWins))
+        obj.put("weekdayAndTagInsights", report.weekdayAndTagInsights)
+        obj.put("gentleAdviceAndQuestions", JSONArray(report.gentleAdviceAndQuestions))
+        obj.put("entriesCount", report.entriesCount)
+        obj.put("averageIntensity", report.averageIntensity.toDouble())
+        obj.put("dominantMoodKey", report.dominantMoodKey)
+        obj.put("topTags", JSONArray(report.topTags))
+        obj.put("createdAtMillis", report.createdAtMillis)
+        obj.put("aiModelBadge", report.aiModelBadge)
+
+        val weekdaysArr = JSONArray()
+        report.weekdayBreakdown.forEach { w ->
+            val wObj = JSONObject()
+            wObj.put("dayIndexMondayFirst", w.dayIndexMondayFirst)
+            wObj.put("shortNameEn", w.shortNameEn)
+            wObj.put("shortNameRu", w.shortNameRu)
+            wObj.put("fullNameEn", w.fullNameEn)
+            wObj.put("fullNameRu", w.fullNameRu)
+            wObj.put("entriesCount", w.entriesCount)
+            wObj.put("averageIntensity", w.averageIntensity.toDouble())
+            wObj.put("dominantMoodKey", w.dominantMoodKey ?: "")
+            weekdaysArr.put(wObj)
+        }
+        obj.put("weekdayBreakdown", weekdaysArr)
+        return obj
+    }
+
+    private fun deserializeCachedReport(obj: JSONObject): AiPsychologicalReport {
+        val weekdaysArr = obj.optJSONArray("weekdayBreakdown")
+        val weekdays = mutableListOf<WeekdayMoodSummary>()
+        if (weekdaysArr != null) {
+            for (i in 0 until weekdaysArr.length()) {
+                val w = weekdaysArr.optJSONObject(i) ?: continue
+                weekdays.add(
+                    WeekdayMoodSummary(
+                        dayIndexMondayFirst = w.optInt("dayIndexMondayFirst", i + 1),
+                        shortNameEn = w.optString("shortNameEn"),
+                        shortNameRu = w.optString("shortNameRu"),
+                        fullNameEn = w.optString("fullNameEn"),
+                        fullNameRu = w.optString("fullNameRu"),
+                        entriesCount = w.optInt("entriesCount", 0),
+                        averageIntensity = w.optDouble("averageIntensity", 0.0).toFloat(),
+                        dominantMoodKey = w.optString("dominantMoodKey").takeIf { it.isNotBlank() }
+                    )
+                )
+            }
+        }
+
+        fun jsonArrayToList(arr: JSONArray?): List<String> {
+            if (arr == null) return emptyList()
+            val list = mutableListOf<String>()
+            for (i in 0 until arr.length()) {
+                list.add(arr.optString(i))
+            }
+            return list
+        }
+
+        return AiPsychologicalReport(
+            periodKey = obj.optString("periodKey"),
+            periodType = obj.optString("periodType", AnalysisPeriodType.MONTHLY.id),
+            periodTitle = obj.optString("periodTitle"),
+            emotionalHeadline = obj.optString("emotionalHeadline"),
+            warmLetter = obj.optString("warmLetter"),
+            emotionalArcSummary = obj.optString("emotionalArcSummary"),
+            energySources = jsonArrayToList(obj.optJSONArray("energySources")),
+            stressTriggers = jsonArrayToList(obj.optJSONArray("stressTriggers")),
+            cognitivePatterns = jsonArrayToList(obj.optJSONArray("cognitivePatterns")),
+            quietWins = jsonArrayToList(obj.optJSONArray("quietWins")),
+            weekdayAndTagInsights = obj.optString("weekdayAndTagInsights"),
+            gentleAdviceAndQuestions = jsonArrayToList(obj.optJSONArray("gentleAdviceAndQuestions")),
+            entriesCount = obj.optInt("entriesCount", 0),
+            averageIntensity = obj.optDouble("averageIntensity", 0.0).toFloat(),
+            dominantMoodKey = obj.optString("dominantMoodKey", BotanicalMood.BALANCE.name),
+            topTags = jsonArrayToList(obj.optJSONArray("topTags")),
+            weekdayBreakdown = weekdays,
+            createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
+            aiModelBadge = obj.optString("aiModelBadge", "Gemini • Firebase AI Logic")
         )
     }
 }
