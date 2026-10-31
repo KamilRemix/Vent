@@ -134,6 +134,21 @@ data class DiaryEntry(
 ) {
     fun botanicalMood(): BotanicalMood = BotanicalMood.fromKey(moodKey)
     fun mood(): BotanicalMood = botanicalMood()
+
+    fun botanicalMoods(): List<BotanicalMood> {
+        val moods = mutableListOf(botanicalMood())
+        tags.forEach { tag ->
+            if (tag.startsWith("mood:")) {
+                val key = tag.removePrefix("mood:")
+                BotanicalMood.entries.firstOrNull { it.key.equals(key, ignoreCase = true) }?.let {
+                    if (!moods.contains(it)) moods.add(it)
+                }
+            }
+        }
+        return moods
+    }
+
+    fun displayTags(): List<String> = tags.filter { !it.startsWith("mood:") }
     fun isFutureLetter(): Boolean =
         id.startsWith("capsule_") || reflectionPrompt?.startsWith("WRITTEN_AT:") == true
 

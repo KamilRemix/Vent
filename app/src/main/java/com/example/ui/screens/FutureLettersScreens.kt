@@ -748,7 +748,7 @@ fun FutureLetterComposerScreen(
 
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var selectedMood by remember { mutableStateOf(BotanicalMood.WARM_ROOT) }
+    var selectedMoods by remember { mutableStateOf(setOf(BotanicalMood.WARM_ROOT)) }
     var photoUrls by remember { mutableStateOf<List<String>>(emptyList()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -893,7 +893,7 @@ fun FutureLetterComposerScreen(
                                 unlockMinute,
                                 title,
                                 content,
-                                selectedMood,
+                                selectedMoods.firstOrNull() ?: BotanicalMood.WARM_ROOT,
                                 photoUrls
                             )
                         },
@@ -1097,14 +1097,26 @@ fun FutureLetterComposerScreen(
 
             // 2. Mood Selection
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = tr("How are you feeling as you write this?", "С каким настроением вы пишете письмо?"),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = tr("How are you feeling as you write this?", "С каким настроением вы пишете письмо?"),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(BotanicalMood.entries) { mood ->
-                        val isSelected = mood == selectedMood
+                        val isSelected = selectedMoods.contains(mood)
                         val bgColor by animateColorAsState(
                             if (isSelected) mood.softBgColor
                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -1119,7 +1131,13 @@ fun FutureLetterComposerScreen(
                                 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             ),
                             modifier = Modifier
-                                .clickable { selectedMood = mood }
+                                .clickable {
+                                    selectedMoods = if (selectedMoods.contains(mood)) {
+                                        if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
+                                    } else {
+                                        selectedMoods + mood
+                                    }
+                                }
                                 .testTag("letter_mood_${mood.key}")
                         ) {
                             Row(
