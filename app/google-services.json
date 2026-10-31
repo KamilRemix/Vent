@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "852279005031",
+    "project_id": "gen-lang-client-0494620647",
+    "storage_bucket": "gen-lang-client-0494620647.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:852279005031:android:2051f8431bc9a586f5a9c2",
+        "android_client_info": {
+          "package_name": "com.aistudio.soulherbarium.kxmzqp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "852279005031-nb847rbp9lfm9ofkk6kiclk9kmmiopmc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.soulherbarium.kxmzqp",
+            "certificate_hash": "614f893a6ecfaeec560a0a7fc536986c3307c234"
+          }
+        },
+        {
+          "client_id": "852279005031-otbenprc9ih1t9qcs7ne3pv7jgsvag0j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.soulherbarium.kxmzqp",
+            "certificate_hash": "1dfa313b2a356cf3dcba1cfe0df35b0c17c26443"
+          }
+        },
+        {
+          "client_id": "852279005031-e0rvfd4l562ept84hhvs9uq98tal4pic.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmtwkCWmXEIuhid6I1cGOmBcxy7HloDMs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "852279005031-e0rvfd4l562ept84hhvs9uq98tal4pic.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
