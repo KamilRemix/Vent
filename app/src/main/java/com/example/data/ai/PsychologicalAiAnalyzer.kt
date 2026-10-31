@@ -337,7 +337,7 @@ object PeriodInsightDetector {
                 dayEntries.map { it.moodIntensity }.average().toFloat()
             } else 0f
             val dominant = if (dayEntries.isNotEmpty()) {
-                dayEntries.groupBy { it.mood.name }.maxByOrNull { it.value.size }?.key
+                dayEntries.groupBy { it.mood().name }.maxByOrNull { it.value.size }?.key
             } else null
 
             WeekdayMoodSummary(
@@ -424,8 +424,8 @@ class PsychologicalAiAnalyzer(private val context: Context) {
 
         // Stage 2: Aggregation
         val weekdayBreakdown = PeriodInsightDetector.computeWeekdayBreakdown(periodEntries)
-        val dominantMood = periodEntries.groupBy { it.mood }
-            .maxByOrNull { it.value.size }?.key ?: BotanicalMood.BALANCE
+        val dominantMood = periodEntries.groupBy { it.mood() }
+            .maxByOrNull { it.value.size }?.key ?: BotanicalMood.CALM_LEAF
         val avgIntensity = periodEntries.map { it.moodIntensity }.average().toFloat()
         val topTags = periodEntries.flatMap { it.tags }
             .groupBy { it }
@@ -494,10 +494,10 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     }
 
     private suspend fun callGeminiWithFallback(prompt: String): Result<String> {
-        val models = listOf("gemini-2.5-flash", "gemini-1.5-flash")
+        val models = listOf("gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite")
         var lastException: Throwable? = null
 
-        val responseSchema = Schema.obj(
+        val schemaDefinition = Schema.obj(
             mapOf(
                 "emotionalHeadline" to Schema.string(),
                 "warmLetter" to Schema.string(),
@@ -518,7 +518,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                     modelName = modelName,
                     generationConfig = generationConfig {
                         responseMimeType = "application/json"
-                        responseSchema = responseSchema
+                        responseSchema = schemaDefinition
                     }
                 )
 
@@ -555,7 +555,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         val entriesText = buildString {
             entries.forEachIndexed { i, e ->
                 appendLine("Запись #${i + 1} [Дата: ${e.dateIso}]:")
-                appendLine("  Настроение: ${e.mood.titleRu} | Интенсивность: ${e.moodIntensity}/5")
+                appendLine("  Настроение: ${e.mood().titleRu} | Интенсивность: ${e.moodIntensity}/5")
                 if (e.tags.isNotEmpty()) appendLine("  Теги: ${e.tags.joinToString(", ")}")
                 if (!e.title.isNullOrBlank()) appendLine("  Заголовок: ${e.title}")
                 appendLine("  Текст: ${e.content}")
@@ -761,7 +761,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             gentleAdviceAndQuestions = jsonArrayToList(obj.optJSONArray("gentleAdviceAndQuestions")),
             entriesCount = obj.optInt("entriesCount", 0),
             averageIntensity = obj.optDouble("averageIntensity", 0.0).toFloat(),
-            dominantMoodKey = obj.optString("dominantMoodKey", BotanicalMood.BALANCE.name),
+            dominantMoodKey = obj.optString("dominantMoodKey", BotanicalMood.CALM_LEAF.name),
             topTags = jsonArrayToList(obj.optJSONArray("topTags")),
             weekdayBreakdown = weekdays,
             createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
