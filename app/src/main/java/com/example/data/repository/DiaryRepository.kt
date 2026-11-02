@@ -67,8 +67,96 @@ class DiaryRepository(
             entry.content.contains("Перечитывая свои мысли, понимаю, как важно замедляться")
     }
 
+    private fun getInitialHistoricalEntries(): List<DiaryEntry> {
+        return listOf(
+            DiaryEntry(
+                id = "day_2026-11-01_5be877",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-11-01",
+                monthDay = "11-01",
+                moodKey = "WARM_ROOT",
+                moodIntensity = 4,
+                title = "",
+                content = "сегодня ходили в бассейн ну было неплохо вечером был папа",
+                reflectionPrompt = "В какой момент сегодня я чувствовал себя наиболее естественно и легко?"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-31_756509",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-31",
+                monthDay = "10-31",
+                moodKey = "CALM_LEAF",
+                moodIntensity = 4,
+                title = "",
+                content = "вчера я провел день дома вечером кодил",
+                reflectionPrompt = "За какую маленькую деталь сегодняшнего дня я искренне благодарен?"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-30_6e7ed7",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-30",
+                monthDay = "10-30",
+                moodKey = "BLOOM",
+                moodIntensity = 5,
+                title = "пятница",
+                content = "сегодня я утром попытался покодить а потом поехал на гудок",
+                reflectionPrompt = "Что сегодня дало мне ощущение внутренней опоры и спокойствия?"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-29_0c3bb4",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-29",
+                monthDay = "10-29",
+                moodKey = "WINTER_SEED",
+                moodIntensity = 1,
+                title = "",
+                content = "к тринадцати часам я ходил к репетитора было все нормально ну в целом день не плохой",
+                reflectionPrompt = "Какая эмоция звучала сегодня громче всего и о чем она хотела сказать?"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-28_bf892a",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-28",
+                monthDay = "10-28",
+                moodKey = "WARM_ROOT",
+                moodIntensity = 4,
+                title = "",
+                content = "сегодня вроде было все неплохо ну утром немного грустненько щас вроде все норм!",
+                reflectionPrompt = "За какую маленькую деталь сегодняшнего дня я искренне благодарен?"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-27_cda567",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-27",
+                monthDay = "10-27",
+                moodKey = "MIST_FERN",
+                moodIntensity = 3,
+                title = "первый денёк каникул",
+                content = "было трудное утро было много слез тоже думал что не смогу жить и в целом день трудный  но вечером было спокойнее",
+                reflectionPrompt = "В какой момент сегодня я чувствовал себя наиболее естественно и легко?",
+                reflectionAnswer = "вечером"
+            ),
+            DiaryEntry(
+                id = "day_2026-10-26_ac7d00",
+                userId = PinLockPreferences.LOCAL_GUEST_UID,
+                dateIso = "2026-10-26",
+                monthDay = "10-26",
+                moodKey = "MIST_FERN",
+                moodIntensity = 3,
+                title = "sad day",
+                content = "очень сильно устал было много стресса было много слез честно даже думал что не смогу жить дальше иза слез и этой двойки было тяжело думал что не смогу жить дальше",
+                reflectionPrompt = "What do I need most right now — support, silence, or rest?"
+            )
+        )
+    }
+
     private fun loadLocalGuestEntries(): List<DiaryEntry> {
-        val raw = localPrefs?.getString(KEY_LOCAL_ENTRIES_JSON, null) ?: return emptyList()
+        val raw = localPrefs?.getString(KEY_LOCAL_ENTRIES_JSON, null)
+        if (raw == null) {
+            val initial = getInitialHistoricalEntries()
+            persistLocalGuestEntries(initial)
+            return initial
+        }
         return try {
             val arr = JSONArray(raw)
             val result = mutableListOf<DiaryEntry>()

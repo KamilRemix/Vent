@@ -84,7 +84,6 @@ import android.content.MutableContextWrapper
 import android.util.Base64
 import com.example.util.trText
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.Firebase
@@ -135,20 +134,10 @@ fun launchOneTapOrGoogleSignIn(
     }
     val lang = AppLocaleHolder.currentLanguage
     val clientId = try {
-        context.getString(R.string.default_web_client_id)
-    } catch (e: Exception) {
-        if (!silentIfNoCredential) {
-            onAuthError(
-                trText(
-                    lang,
-                    "Google Sign-In configuration missing: default_web_client_id not found",
-                    "Конфигурация Google Sign-In отсутствует: default_web_client_id не найден"
-                )
-            )
-        } else {
-            onAuthCancelled()
-        }
-        return
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (resId != 0) context.getString(resId) else "852279005031-e0rvfd4l562ept84hhvs9uq98tal4pic.apps.googleusercontent.com"
+    } catch (_: Exception) {
+        "852279005031-e0rvfd4l562ept84hhvs9uq98tal4pic.apps.googleusercontent.com"
     }
 
     val activityContext = context.findActivity()?.let { MutableContextWrapper(it) } ?: context
@@ -156,72 +145,38 @@ fun launchOneTapOrGoogleSignIn(
     scope.launch {
         try {
             val result = if (silentIfNoCredential) {
-                // 1. Silent auto sign-in for previously authorized Google accounts
-                val authorizedGoogleIdOption = GetGoogleIdOption.Builder()
+                // 1. Silent check: only if account was already authorized in this app
+                val authorizedOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(true)
                     .setServerClientId(clientId)
                     .setAutoSelectEnabled(true)
                     .build()
 
-                val authorizedRequest = GetCredentialRequest.Builder()
-                    .addCredentialOption(authorizedGoogleIdOption)
+                val silentRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(authorizedOption)
                     .build()
 
-                try {
-                    credentialManager.getCredential(
-                        request = authorizedRequest,
-                        context = activityContext
-                    )
-                } catch (e: NoCredentialException) {
-                    // 2. If no previously authorized account, slide up the One Tap bottom sheet
-                    // with all Google accounts on the device
-                    val oneTapOption = GetGoogleIdOption.Builder()
-                        .setFilterByAuthorizedAccounts(false)
-                        .setServerClientId(clientId)
-                        .setAutoSelectEnabled(false)
-                        .build()
-
-                    val oneTapRequest = GetCredentialRequest.Builder()
-                        .addCredentialOption(oneTapOption)
-                        .build()
-
-                    credentialManager.getCredential(
-                        request = oneTapRequest,
-                        context = activityContext
-                    )
-                }
+                credentialManager.getCredential(
+                    request = silentRequest,
+                    context = activityContext
+                )
             } else {
-                // Interactive sign-in: show the native One Tap bottom sheet with all Google accounts
+                // 2. Interactive user tap: ALWAYS slide up the native Google One Tap bottom sheet
+                // with all accounts on the device, account avatar, and "Continue as [Name]"
                 val oneTapOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
                     .setServerClientId(clientId)
-                    .setAutoSelectEnabled(true)
+                    .setAutoSelectEnabled(false)
                     .build()
 
                 val interactiveRequest = GetCredentialRequest.Builder()
                     .addCredentialOption(oneTapOption)
                     .build()
 
-                try {
-                    credentialManager.getCredential(
-                        request = interactiveRequest,
-                        context = activityContext
-                    )
-                } catch (e: NoCredentialException) {
-                    // Fallback to legacy sign-in option only if One Tap accounts cannot be queried
-                    val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
-                        serverClientId = clientId
-                    ).build()
-
-                    val fallbackRequest = GetCredentialRequest.Builder()
-                        .addCredentialOption(signInWithGoogleOption)
-                        .build()
-
-                    credentialManager.getCredential(
-                        request = fallbackRequest,
-                        context = activityContext
-                    )
-                }
+                credentialManager.getCredential(
+                    request = interactiveRequest,
+                    context = activityContext
+                )
             }
 
             val credential = result.credential
