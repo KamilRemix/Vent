@@ -16,8 +16,10 @@ import com.example.data.model.DiaryEntry
 import com.example.data.repository.DiaryRepository
 import com.example.data.repository.PhotoStorageRepository
 import com.example.notifications.LetterUnlockScheduler
+import com.example.util.AppLanguage
 import com.example.util.AppLocaleHolder
 import com.example.util.DateAndPhotoUtils
+import com.example.util.GoogleAuthValidator
 import com.example.util.trText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -490,6 +492,13 @@ class DiaryViewModel(
     ) {
         viewModelScope.launch {
             val lang = AppLocaleHolder.currentLanguage
+            if (!GoogleAuthValidator.isGenuineGoogleUser()) {
+                val authMsg = GoogleAuthValidator.getAiAuthRequiredMessage(lang == AppLanguage.RU)
+                _aiAnalysisUiState.value = AiAnalysisUiState.Error(authMsg)
+                _statusBannerMessage.value = authMsg
+                return@launch
+            }
+
             val analyzer = aiAnalyzer ?: PsychologicalAiAnalyzer(context)
             val periodTitle = period.localizedTitle(lang)
             _selectedAiPeriodKey.value = period.periodKey

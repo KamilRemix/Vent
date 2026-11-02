@@ -6,6 +6,7 @@ import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
 import com.example.util.AppLanguage
 import com.example.util.DateAndPhotoUtils
+import com.example.util.GoogleAuthValidator
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.Schema
@@ -405,6 +406,11 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         lang: AppLanguage = AppLanguage.RU,
         onProgress: (Int, String, String) -> Unit = { _, _, _ -> }
     ): Result<AiPsychologicalReport> {
+        if (!GoogleAuthValidator.isGenuineGoogleUser()) {
+            val authMsg = GoogleAuthValidator.getAiAuthRequiredMessage(lang == AppLanguage.RU)
+            return Result.failure(SecurityException(authMsg))
+        }
+
         if (periodEntries.isEmpty()) {
             val emptyMsg = if (lang == AppLanguage.RU) {
                 "За выбранный период «${period.localizedTitle(lang)}» пока нет записей. Добавьте хотя бы одну запись в дневник, чтобы Gemini AI мог провести анализ."

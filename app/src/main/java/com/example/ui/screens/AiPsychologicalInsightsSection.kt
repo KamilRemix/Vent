@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Spa
@@ -80,6 +81,7 @@ import com.example.data.ai.WeekdayMoodSummary
 import com.example.data.model.BotanicalMood
 import com.example.ui.components.BotanicalMoodIllustration
 import com.example.ui.theme.NunitoFontFamily
+import com.example.util.GoogleAuthValidator
 import com.example.util.LocalAppLanguage
 import com.example.util.tr
 
@@ -258,10 +260,12 @@ fun AiPsychologicalHubSection(
             ?: (aiUiState as? AiAnalysisUiState.Success)?.report?.takeIf { it.periodKey == period.periodKey }
     }
 
+    val isGoogleUser = remember { GoogleAuthValidator.isGenuineGoogleUser() }
     var lastAutoRequestedKey by remember { mutableStateOf<String?>(null) }
 
-    // Auto-generate report once when opening a period that doesn't have a saved report yet
-    LaunchedEffect(activePeriod?.periodKey, activePeriod?.entriesCount) {
+    // Auto-generate report once when opening a period that doesn't have a saved report yet (only for genuine Google users)
+    LaunchedEffect(activePeriod?.periodKey, activePeriod?.entriesCount, isGoogleUser) {
+        if (!isGoogleUser) return@LaunchedEffect
         val period = activePeriod ?: return@LaunchedEffect
         val existing = savedReports[period.periodKey]
         val requestSignature = "${period.periodKey}_${period.entriesCount}"
@@ -476,57 +480,96 @@ fun AiPsychologicalHubSection(
 
                     val generatingState = aiUiState as? AiAnalysisUiState.Generating
                     val isGenerating = generatingState != null
-                    Button(
-                        onClick = { onGenerateOrRefreshReport(activePeriod) },
-                        enabled = !isGenerating,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .testTag("generate_ai_report_button"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        if (generatingState != null) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.5.dp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = tr(
-                                    "Analyzing state... ${generatingState.progressPercent}%",
-                                    "Идёт психологический разбор... ${generatingState.progressPercent}%"
-                                ),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontFamily = NunitoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (currentSavedReport != null) Icons.Filled.Refresh else Icons.Filled.AutoAwesome,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = when {
-                                    currentSavedReport != null -> tr(
-                                        "Refresh Analysis (${activePeriod.localizedTitle(lang)})",
-                                        "Обновить разбор (${activePeriod.localizedTitle(lang)})"
+
+                    if (!isGoogleUser) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    else -> tr(
-                                        "Analyze My State (${activePeriod.localizedTitle(lang)})",
-                                        "Проанализировать состояние (${activePeriod.localizedTitle(lang)})"
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = tr("Google Account Required for AI", "Вход через Google для работы ИИ"),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                }
+                                Text(
+                                    text = tr(
+                                        "Personalized psychological reflections and Gemini AI insights are available exclusively for verified Google accounts. Please sign in with Google in Settings to unlock deep analysis.",
+                                        "Психологический разбор и персонализация Gemini AI доступны только для подтвержденных Google-аккаунтов. Пожалуйста, выполните вход через Google в настройках приложения, чтобы открыть глубокий анализ записей."
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { onGenerateOrRefreshReport(activePeriod) },
+                            enabled = !isGenerating,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .testTag("generate_ai_report_button"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
                             )
+                        ) {
+                            if (generatingState != null) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.5.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = tr(
+                                        "Analyzing state... ${generatingState.progressPercent}%",
+                                        "Идёт психологический разбор... ${generatingState.progressPercent}%"
+                                    ),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = if (currentSavedReport != null) Icons.Filled.Refresh else Icons.Filled.AutoAwesome,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = when {
+                                        currentSavedReport != null -> tr(
+                                            "Refresh Analysis (${activePeriod.localizedTitle(lang)})",
+                                            "Обновить разбор (${activePeriod.localizedTitle(lang)})"
+                                        )
+                                        else -> tr(
+                                            "Analyze My State (${activePeriod.localizedTitle(lang)})",
+                                            "Проанализировать состояние (${activePeriod.localizedTitle(lang)})"
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }

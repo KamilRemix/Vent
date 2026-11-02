@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -154,36 +156,72 @@ fun launchOneTapOrGoogleSignIn(
     scope.launch {
         try {
             val result = if (silentIfNoCredential) {
-                // Silent auto sign-in request with GetGoogleIdOption
+                // 1. Silent auto sign-in for previously authorized Google accounts
                 val authorizedGoogleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(true)
                     .setServerClientId(clientId)
                     .setAutoSelectEnabled(true)
-                    .setNonce(generateSecureRandomNonce())
                     .build()
 
                 val authorizedRequest = GetCredentialRequest.Builder()
                     .addCredentialOption(authorizedGoogleIdOption)
                     .build()
 
-                credentialManager.getCredential(
-                    request = authorizedRequest,
-                    context = activityContext
-                )
-            } else {
-                // Interactive sign-in request with GetSignInWithGoogleOption
-                val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
-                    serverClientId = clientId
-                ).setNonce(generateSecureRandomNonce()).build()
+                try {
+                    credentialManager.getCredential(
+                        request = authorizedRequest,
+                        context = activityContext
+                    )
+                } catch (e: NoCredentialException) {
+                    // 2. If no previously authorized account, slide up the One Tap bottom sheet
+                    // with all Google accounts on the device
+                    val oneTapOption = GetGoogleIdOption.Builder()
+                        .setFilterByAuthorizedAccounts(false)
+                        .setServerClientId(clientId)
+                        .setAutoSelectEnabled(false)
+                        .build()
 
-                val interactiveRequest = GetCredentialRequest.Builder()
-                    .addCredentialOption(signInWithGoogleOption)
+                    val oneTapRequest = GetCredentialRequest.Builder()
+                        .addCredentialOption(oneTapOption)
+                        .build()
+
+                    credentialManager.getCredential(
+                        request = oneTapRequest,
+                        context = activityContext
+                    )
+                }
+            } else {
+                // Interactive sign-in: show the native One Tap bottom sheet with all Google accounts
+                val oneTapOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(clientId)
+                    .setAutoSelectEnabled(true)
                     .build()
 
-                credentialManager.getCredential(
-                    request = interactiveRequest,
-                    context = activityContext
-                )
+                val interactiveRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(oneTapOption)
+                    .build()
+
+                try {
+                    credentialManager.getCredential(
+                        request = interactiveRequest,
+                        context = activityContext
+                    )
+                } catch (e: NoCredentialException) {
+                    // Fallback to legacy sign-in option only if One Tap accounts cannot be queried
+                    val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(
+                        serverClientId = clientId
+                    ).build()
+
+                    val fallbackRequest = GetCredentialRequest.Builder()
+                        .addCredentialOption(signInWithGoogleOption)
+                        .build()
+
+                    credentialManager.getCredential(
+                        request = fallbackRequest,
+                        context = activityContext
+                    )
+                }
             }
 
             val credential = result.credential
@@ -313,20 +351,22 @@ fun AuthWelcomeScreen(
                     .padding(vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    BotanicalHeroArtCard(height = 170.dp)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(16.dp)
+                Card(
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFFAF7F2)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.size(116.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BotanicalMoodIllustration(mood = BotanicalMood.CALM_LEAF, size = 48.dp)
-                            BotanicalMoodIllustration(mood = BotanicalMood.BLOOM, size = 60.dp)
-                            BotanicalMoodIllustration(mood = BotanicalMood.WARM_ROOT, size = 48.dp)
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_vent_logo),
+                            contentDescription = "Vent Official Logo",
+                            modifier = Modifier.size(86.dp)
+                        )
                     }
                 }
 
