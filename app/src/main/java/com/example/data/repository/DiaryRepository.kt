@@ -31,7 +31,12 @@ class DiaryRepository(
 
     constructor(context: Context) : this(
         FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
+            try {
+                val resId = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
+                if (resId != 0) context.getString(resId) else "ai-studio-android-e547b8f5-ef0e-49a9-96b8-b8956da99d71"
+            } catch (_: Exception) {
+                "ai-studio-android-e547b8f5-ef0e-49a9-96b8-b8956da99d71"
+            }
         ),
         context.applicationContext
     )
@@ -150,11 +155,33 @@ class DiaryRepository(
         )
     }
 
+    private fun saveEntriesToPrefs(entries: List<DiaryEntry>) {
+        val prefs = localPrefs ?: return
+        val arr = JSONArray()
+        for (entry in entries) {
+            val obj = JSONObject().apply {
+                put("id", entry.id)
+                put("dateIso", entry.dateIso)
+                put("monthDay", entry.monthDay)
+                put("moodKey", entry.moodKey)
+                put("moodIntensity", entry.moodIntensity)
+                put("title", entry.title)
+                put("content", entry.content)
+                if (!entry.reflectionPrompt.isNullOrBlank()) put("reflectionPrompt", entry.reflectionPrompt)
+                if (!entry.reflectionAnswer.isNullOrBlank()) put("reflectionAnswer", entry.reflectionAnswer)
+                put("tags", JSONArray(entry.tags))
+                put("photoUrls", JSONArray(entry.photoUrls))
+            }
+            arr.put(obj)
+        }
+        prefs.edit().putString(KEY_LOCAL_ENTRIES_JSON, arr.toString()).apply()
+    }
+
     private fun loadLocalGuestEntries(): List<DiaryEntry> {
         val raw = localPrefs?.getString(KEY_LOCAL_ENTRIES_JSON, null)
         if (raw == null) {
             val initial = getInitialHistoricalEntries()
-            persistLocalGuestEntries(initial)
+            saveEntriesToPrefs(initial)
             return initial
         }
         return try {
@@ -195,26 +222,8 @@ class DiaryRepository(
 
     private fun persistLocalGuestEntries(entries: List<DiaryEntry>) {
         val sorted = entries.sortedByDescending { it.dateIso }
+        saveEntriesToPrefs(sorted)
         localEntriesFlow.value = sorted
-        val prefs = localPrefs ?: return
-        val arr = JSONArray()
-        for (entry in sorted) {
-            val obj = JSONObject().apply {
-                put("id", entry.id)
-                put("dateIso", entry.dateIso)
-                put("monthDay", entry.monthDay)
-                put("moodKey", entry.moodKey)
-                put("moodIntensity", entry.moodIntensity)
-                put("title", entry.title)
-                put("content", entry.content)
-                if (!entry.reflectionPrompt.isNullOrBlank()) put("reflectionPrompt", entry.reflectionPrompt)
-                if (!entry.reflectionAnswer.isNullOrBlank()) put("reflectionAnswer", entry.reflectionAnswer)
-                put("tags", JSONArray(entry.tags))
-                put("photoUrls", JSONArray(entry.photoUrls))
-            }
-            arr.put(obj)
-        }
-        prefs.edit().putString(KEY_LOCAL_ENTRIES_JSON, arr.toString()).apply()
     }
 
     private suspend fun syncGuestEntriesToCloudIfAny(cloudUid: String) {

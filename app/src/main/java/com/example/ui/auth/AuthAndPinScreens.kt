@@ -140,7 +140,7 @@ fun launchOneTapOrGoogleSignIn(
         "852279005031-e0rvfd4l562ept84hhvs9uq98tal4pic.apps.googleusercontent.com"
     }
 
-    val activityContext = context.findActivity()?.let { MutableContextWrapper(it) } ?: context
+    val activityContext = context.findActivity() ?: context
 
     scope.launch {
         try {
