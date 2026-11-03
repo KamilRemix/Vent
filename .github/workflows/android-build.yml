@@ -34,6 +34,15 @@ jobs:
             echo "Successfully restored app/google-services.json from secure secret."
           fi
 
+      - name: Restore Gemini API Key Config
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+            echo "Successfully restored .env secret for Gemini API."
+          fi
+
       - name: Accept Android SDK Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true

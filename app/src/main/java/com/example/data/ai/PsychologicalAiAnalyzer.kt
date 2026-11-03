@@ -78,7 +78,7 @@ data class AiPsychologicalReport(
     val topTags: List<String>,
     val weekdayBreakdown: List<WeekdayMoodSummary>,
     val createdAtMillis: Long,
-    val aiModelBadge: String = "Gemini 3.8 Flash • Firebase AI Logic"
+    val aiModelBadge: String = "Gemini 2.5 Flash • Google AI"
 ) {
     fun dominantMood(): BotanicalMood = BotanicalMood.fromKey(dominantMoodKey)
 }
@@ -500,7 +500,29 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     }
 
     private suspend fun callGeminiWithFallback(prompt: String): Result<String> {
-        val models = listOf("gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash")
+        val apiKey = try {
+            com.example.BuildConfig.GEMINI_API_KEY.trim()
+        } catch (_: Throwable) {
+            ""
+        }
+
+        // Primary: Fast direct call via Google AI Studio API with gemini-2.5-flash (no App Check blocks)
+        if (apiKey.isNotBlank() && !apiKey.startsWith("default_")) {
+            try {
+                Log.d(TAG, "Calling direct Gemini API with gemini-2.5-flash")
+                val directResult = callGeminiViaDirectApi(prompt, apiKey, "gemini-2.5-flash")
+                if (directResult.isSuccess) {
+                    Log.d(TAG, "Direct Gemini 2.5 Flash succeeded")
+                    return directResult
+                }
+                Log.w(TAG, "Direct Gemini call failed: ${directResult.exceptionOrNull()?.message}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Direct Gemini call exception", e)
+            }
+        }
+
+        // Secondary fallback: Firebase Vertex AI Logic
+        val models = listOf("gemini-2.5-flash", "gemini-2.0-flash")
         var lastException: Throwable? = null
 
         val schemaDefinition = Schema.obj(
@@ -528,7 +550,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
                     }
                 )
 
-                val response = withTimeout(35000L) {
+                val response = withTimeout(15000L) {
                     generativeModel.generateContent(prompt)
                 }
                 val text = response.text
@@ -546,6 +568,89 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         }
 
         return Result.failure(lastException ?: RuntimeException("All Gemini models failed to respond"))
+    }
+
+    private suspend fun callGeminiViaDirectApi(
+        prompt: String,
+        apiKey: String,
+        modelName: String = "gemini-2.5-flash"
+    ): Result<String> = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
+            val connection = (url.openConnection() as java.net.HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 15000
+                readTimeout = 25000
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("User-Agent", "Vent-Android")
+            }
+
+            val schemaObj = JSONObject().apply {
+                put("type", "OBJECT")
+                val props = JSONObject().apply {
+                    put("emotionalHeadline", JSONObject().put("type", "STRING"))
+                    put("warmLetter", JSONObject().put("type", "STRING"))
+                    put("emotionalArcSummary", JSONObject().put("type", "STRING"))
+                    put("energySources", JSONObject().put("type", "ARRAY").put("items", JSONObject().put("type", "STRING")))
+                    put("stressTriggers", JSONObject().put("type", "ARRAY").put("items", JSONObject().put("type", "STRING")))
+                    put("cognitivePatterns", JSONObject().put("type", "ARRAY").put("items", JSONObject().put("type", "STRING")))
+                    put("quietWins", JSONObject().put("type", "ARRAY").put("items", JSONObject().put("type", "STRING")))
+                    put("weekdayAndTagInsights", JSONObject().put("type", "STRING"))
+                    put("gentleAdviceAndQuestions", JSONObject().put("type", "ARRAY").put("items", JSONObject().put("type", "STRING")))
+                }
+                put("properties", props)
+                put("required", JSONArray(listOf(
+                    "emotionalHeadline", "warmLetter", "emotionalArcSummary",
+                    "energySources", "stressTriggers", "cognitivePatterns",
+                    "quietWins", "weekdayAndTagInsights", "gentleAdviceAndQuestions"
+                )))
+            }
+
+            val requestBody = JSONObject().apply {
+                val parts = JSONArray().put(JSONObject().put("text", prompt))
+                val contents = JSONArray().put(JSONObject().put("parts", parts))
+                put("contents", contents)
+                val genConfig = JSONObject().apply {
+                    put("responseMimeType", "application/json")
+                    put("responseSchema", schemaObj)
+                    put("temperature", 0.7)
+                }
+                put("generationConfig", genConfig)
+            }
+
+            connection.outputStream.use { os ->
+                val bytes = requestBody.toString().toByteArray(Charsets.UTF_8)
+                os.write(bytes)
+                os.flush()
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val respJson = JSONObject(responseText)
+                val candidates = respJson.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val candidate = candidates.getJSONObject(0)
+                    val content = candidate.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val text = parts.getJSONObject(0).optString("text")
+                        if (text.isNotBlank()) {
+                            return@withContext Result.success(text)
+                        }
+                    }
+                }
+                Result.failure(RuntimeException("Empty content received from Gemini direct API"))
+            } else {
+                val errText = try {
+                    connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                } catch (_: Exception) { null }
+                Result.failure(RuntimeException("Gemini API error ($responseCode): ${errText?.take(150)}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun buildPsychologistPrompt(
@@ -771,7 +876,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             topTags = jsonArrayToList(obj.optJSONArray("topTags")),
             weekdayBreakdown = weekdays,
             createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
-            aiModelBadge = obj.optString("aiModelBadge", "Gemini 3.8 Flash • Firebase AI Logic")
+            aiModelBadge = obj.optString("aiModelBadge", "Gemini 2.5 Flash • Google AI")
         )
     }
 }
