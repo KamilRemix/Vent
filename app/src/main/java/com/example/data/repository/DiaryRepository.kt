@@ -51,7 +51,7 @@ class DiaryRepository(
     private val localEntriesFlow = MutableStateFlow(loadLocalGuestEntries())
 
     private fun isGuestMode(userId: String? = auth.currentUser?.uid): Boolean {
-        return userId.isNullOrBlank() || userId == PinLockPreferences.LOCAL_GUEST_UID || auth.currentUser == null
+        return userId.isNullOrBlank() || userId == PinLockPreferences.LOCAL_GUEST_UID
     }
 
     private fun requireUserId(): String {
@@ -220,7 +220,6 @@ class DiaryRepository(
             db.collection("users")
                 .document(userId)
                 .collection("entries")
-                .whereEqualTo("userId", userId)
                 .snapshots()
                 .map { snapshot ->
                     snapshot.documents.mapNotNull { doc ->
@@ -255,7 +254,6 @@ class DiaryRepository(
             val snapshot = db.collection("users")
                 .document(uid)
                 .collection("entries")
-                .whereEqualTo("userId", uid)
                 .get()
                 .await()
             val list = snapshot.documents.mapNotNull { doc ->
@@ -446,7 +444,6 @@ class DiaryRepository(
             val snapshot = db.collection("users")
                 .document(uid)
                 .collection("entries")
-                .whereEqualTo("userId", uid)
                 .get()
                 .await()
             var deletedCount = 0

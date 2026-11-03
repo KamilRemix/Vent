@@ -54,10 +54,13 @@ fun JournalHomeTab(
     onThisDayEntries: List<DiaryEntry>,
     recommendedAiPeriod: AvailableAnalysisPeriod? = null,
     hasSavedAiReport: Boolean = false,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
     onOpenAiAnalysis: (String) -> Unit = {},
     onCreateNewForDate: (String) -> Unit,
     onViewEntry: (DiaryEntry) -> Unit,
-    onOpenCalendar: () -> Unit
+    onOpenCalendar: () -> Unit,
+    onSelectDate: (String) -> Unit = {}
 ) {
     val lang = LocalAppLanguage.current
     val latestMood = entriesForSelectedDate.firstOrNull()?.botanicalMood()
@@ -256,6 +259,134 @@ fun JournalHomeTab(
             }
         }
 
+        if (isLoading) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Column {
+                            Text(
+                                text = tr("Syncing your journal...", "Синхронизация записей..."),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = tr("Loading encrypted entries from cloud", "Загрузка ваших записей из облака"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (errorMessage != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Column {
+                            Text(
+                                text = tr("Sync paused", "Ошибка синхронизации"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = errorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reassurance banner when selected date is empty but previous entries exist in account
+        if (entriesForSelectedDate.isEmpty() && entries.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            entries.firstOrNull()?.let { onSelectDate(it.dateIso) }
+                        },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr(
+                                    "Saved in your cloud: ${entries.size} entries",
+                                    "В вашем аккаунте: ${entries.size} сохранённых записей"
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = tr(
+                                    "Latest from ${DateAndPhotoUtils.formatFullDate(entries.first().dateIso, lang)}. Tap to open.",
+                                    "Последняя от ${DateAndPhotoUtils.formatFullDate(entries.first().dateIso, lang)}. Нажмите, чтобы открыть."
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         if (entriesForSelectedDate.isEmpty()) {
             item {
                 EmptyDayEntryPromptCard(
@@ -273,12 +404,12 @@ fun JournalHomeTab(
         }
 
         // 4. Recent Timeline Feed (other dates)
-        val otherEntries = entries.filter { it.dateIso != selectedDateIso }.take(20)
+        val otherEntries = entries.filter { it.dateIso != selectedDateIso }.take(50)
         if (otherEntries.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = tr("Recent Timeline", "Недавние записи"),
+                    text = tr("Recent Timeline (${otherEntries.size})", "Недавние записи (${otherEntries.size})"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground

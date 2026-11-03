@@ -40,6 +40,7 @@ jobs:
         run: |
           if [ -n "$GEMINI_API_KEY" ]; then
             echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+            echo "GEMINI_API_KEY=$GEMINI_API_KEY" > app/.env
             echo "Successfully restored .env secret for Gemini API."
           fi
 
@@ -70,6 +71,8 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew clean assembleDebug --no-build-cache --stacktrace
 
       - name: Verify APK Generated

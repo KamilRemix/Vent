@@ -334,6 +334,7 @@ fun BotanicalDiaryApp() {
                                     val newUid = Firebase.auth.currentUser?.uid
                                     currentUserId = newUid
                                     currentUserEmail = Firebase.auth.currentUser?.email
+                                    isSettingsOpen = false
                                     scope.launch {
                                         snackbarHostState.showSnackbar(
                                             if (resolvedLanguage == AppLanguage.RU) "Вход в Google выполнен" else "Signed in to Google"
@@ -527,6 +528,8 @@ fun BotanicalDiaryApp() {
                                     onThisDayEntries = onThisDayEntries,
                                     recommendedAiPeriod = recommendedHomeAiPeriod,
                                     hasSavedAiReport = recommendedHomeAiPeriod?.let { savedAiReports.containsKey(it.periodKey) } == true,
+                                    isLoading = entriesUiState is UiState.Loading,
+                                    errorMessage = (entriesUiState as? UiState.Error)?.message,
                                     onOpenAiAnalysis = { periodKey ->
                                         viewModel.selectAiPeriodKey(periodKey, entries)
                                         currentTab = MainDestination.INSIGHTS
@@ -545,6 +548,9 @@ fun BotanicalDiaryApp() {
                                     },
                                     onOpenCalendar = {
                                         currentTab = MainDestination.CALENDAR
+                                    },
+                                    onSelectDate = { dateIso ->
+                                        viewModel.selectDate(dateIso)
                                     }
                                 )
                             }

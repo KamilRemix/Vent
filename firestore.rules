@@ -58,15 +58,9 @@ service cloud.firestore {
     }
 
     match /users/{userId}/entries/{entryId} {
-      allow get: if isSignedIn() &&
-                    request.auth.uid == userId &&
-                    isValidId(userId) &&
-                    isValidId(entryId) &&
-                    existing().userId == request.auth.uid;
-
-      allow list: if isSignedIn() &&
-                     request.auth.uid == userId &&
-                     existing().userId == request.auth.uid;
+      allow get, list: if isSignedIn() &&
+                          request.auth.uid == userId &&
+                          isValidId(userId);
 
       allow create: if isSignedIn() &&
                        request.auth.uid == userId &&
@@ -126,8 +120,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() &&
                        request.auth.uid == userId &&
                        isValidId(userId) &&
-                       isValidId(entryId) &&
-                       existing().userId == request.auth.uid;
+                       isValidId(entryId);
     }
   }
 }

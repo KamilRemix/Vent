@@ -17,10 +17,19 @@ android {
     applicationId = "com.vent.diary"
     minSdk = 24
     targetSdk = 36
-    versionCode = 11
-    versionName = "2.9"
+    versionCode = 12
+    versionName = "3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val geminiKey = System.getenv("GEMINI_API_KEY") 
+        ?: project.findProperty("GEMINI_API_KEY") as? String 
+        ?: (if (rootProject.file(".env").exists()) {
+            java.util.Properties().apply {
+                load(rootProject.file(".env").inputStream())
+            }.getProperty("GEMINI_API_KEY")
+        } else null) ?: ""
+    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -74,8 +83,8 @@ android {
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
+  propertiesFileName = "../.env"
+  defaultPropertiesFileName = "../.env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
 
