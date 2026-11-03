@@ -183,7 +183,25 @@ fun launchOneTapOrGoogleSignIn(
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                 val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                Firebase.auth.signInWithCredential(authCredential).await()
+                
+                // Retry Firebase authentication up to 3 times with exponential backoff for transient network glitches
+                var authError: Exception? = null
+                for (attempt in 1..3) {
+                    try {
+                        Firebase.auth.signInWithCredential(authCredential).await()
+                        authError = null
+                        break
+                    } catch (e: Exception) {
+                        Log.w("Auth", "Attempt $attempt signInWithCredential failed: ${e.message}")
+                        authError = e
+                        if (attempt < 3) {
+                            kotlinx.coroutines.delay(600L * attempt)
+                        }
+                    }
+                }
+                if (authError != null) {
+                    throw authError
+                }
                 onAuthSuccess()
             } else {
                 onAuthError(
@@ -215,13 +233,29 @@ fun launchOneTapOrGoogleSignIn(
             if (silentIfNoCredential) {
                 onAuthCancelled()
             } else {
-                onAuthError(
-                    e.localizedMessage ?: trText(
+                val rawMsg = e.localizedMessage ?: e.message ?: ""
+                val isNetworkOrSsl = rawMsg.contains("SSL", ignoreCase = true) ||
+                    rawMsg.contains("Cipher", ignoreCase = true) ||
+                    rawMsg.contains("DECRYPTION", ignoreCase = true) ||
+                    rawMsg.contains("protocol error", ignoreCase = true) ||
+                    rawMsg.contains("Socket", ignoreCase = true) ||
+                    rawMsg.contains("ConnectException", ignoreCase = true)
+                val displayMsg = if (isNetworkOrSsl) {
+                    trText(
                         lang,
-                        "Failed to sign in with Google",
-                        "Не удалось выполнить вход через Google"
+                        "Network connection interrupted. Please try signing in again.",
+                        "Сбой сетевого соединения с сервером Google. Пожалуйста, повторите попытку входа."
                     )
-                )
+                } else {
+                    rawMsg.ifBlank {
+                        trText(
+                            lang,
+                            "Failed to sign in with Google",
+                            "Не удалось выполнить вход через Google"
+                        )
+                    }
+                }
+                onAuthError(displayMsg)
             }
         }
     }

@@ -61,7 +61,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew clean assembleDebug --no-build-cache --stacktrace
 
       - name: Verify APK Generated
         run: |
