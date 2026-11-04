@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
@@ -450,7 +451,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         onProgress(
             60,
             if (lang == AppLanguage.RU) "Запрос к Gemini Flash" else "Querying Gemini Flash",
-            if (lang == AppLanguage.RU) "Генерация теплого психологического анализа..." else "Generating empathetic reflections..."
+            if (lang == AppLanguage.RU) "Считывание контекста и ритма мыслей..." else "Reading journal rhythm and context..."
         )
 
         val prompt = buildPsychologistPrompt(
@@ -463,7 +464,33 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             lang = lang
         )
 
-        val geminiResult = callGeminiWithFallback(prompt)
+        val progressJob = CoroutineScope(Dispatchers.Default).launch {
+            val stages = if (lang == AppLanguage.RU) {
+                listOf(
+                    Triple(68, "Считывание ритма мыслей", "Анализ саундтрека и эмоциональных триггеров..."),
+                    Triple(76, "Глубокое понимание", "Выявление источников сил и скрытых переживаний..."),
+                    Triple(84, "Формулирование отклика", "Подбор искренних слов дружеской поддержки..."),
+                    Triple(89, "Финальные штрихи", "Формирование мягких рекомендаций для заботы о себе...")
+                )
+            } else {
+                listOf(
+                    Triple(68, "Reading thought rhythm", "Reflecting on soundtracks and emotional cues..."),
+                    Triple(76, "Deep understanding", "Detecting quiet wins and energy sources..."),
+                    Triple(84, "Crafting warm response", "Selecting compassionate words of support..."),
+                    Triple(89, "Final touches", "Gathering gentle self-care advice...")
+                )
+            }
+            for ((pct, title, detail) in stages) {
+                delay(750)
+                onProgress(pct, title, detail)
+            }
+        }
+
+        val geminiResult = try {
+            callGeminiWithFallback(prompt)
+        } finally {
+            progressJob.cancel()
+        }
 
         return if (geminiResult.isSuccess) {
             onProgress(
@@ -514,23 +541,27 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             }
         }
 
-        // Primary: Fast direct call via Google AI Studio API with gemini-2.5-flash (no App Check blocks)
+        // Primary: Fast direct call via Google AI Studio API
+        // Cascade: gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-2.0-flash
         if (apiKey.isNotBlank() && !apiKey.startsWith("default_")) {
-            try {
-                Log.d(TAG, "Calling direct Gemini API with gemini-2.5-flash")
-                val directResult = callGeminiViaDirectApi(prompt, apiKey, "gemini-2.5-flash")
-                if (directResult.isSuccess) {
-                    Log.d(TAG, "Direct Gemini 2.5 Flash succeeded")
-                    return directResult
+            val directModels = listOf("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash")
+            for (modelName in directModels) {
+                try {
+                    Log.d(TAG, "Calling direct Gemini API with model: $modelName")
+                    val directResult = callGeminiViaDirectApi(prompt, apiKey, modelName)
+                    if (directResult.isSuccess) {
+                        Log.d(TAG, "Direct Gemini ($modelName) succeeded")
+                        return directResult
+                    }
+                    Log.w(TAG, "Direct Gemini ($modelName) failed: ${directResult.exceptionOrNull()?.message}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Direct Gemini ($modelName) exception", e)
                 }
-                Log.w(TAG, "Direct Gemini call failed: ${directResult.exceptionOrNull()?.message}")
-            } catch (e: Exception) {
-                Log.w(TAG, "Direct Gemini call exception", e)
             }
         }
 
         // Secondary fallback: Firebase Vertex AI Logic
-        val models = listOf("gemini-2.5-flash", "gemini-2.0-flash")
+        val models = listOf("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash")
         var lastException: Throwable? = null
 
         val schemaDefinition = Schema.obj(
@@ -675,7 +706,12 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             entries.forEachIndexed { i, e ->
                 appendLine("Запись #${i + 1} [Дата: ${e.dateIso}]:")
                 appendLine("  Настроение: ${e.mood().titleRu} | Интенсивность: ${e.moodIntensity}/5")
-                if (e.tags.isNotEmpty()) appendLine("  Теги: ${e.tags.joinToString(", ")}")
+                val track = e.musicTrack()
+                if (!track.isNullOrBlank()) {
+                    appendLine("  Саундтрек дня / музыка: $track")
+                }
+                val tagsToDisplay = e.displayTags()
+                if (tagsToDisplay.isNotEmpty()) appendLine("  Теги: ${tagsToDisplay.joinToString(", ")}")
                 if (!e.title.isNullOrBlank()) appendLine("  Заголовок: ${e.title}")
                 appendLine("  Текст: ${e.content}")
                 if (!e.reflectionAnswer.isNullOrBlank()) {
@@ -700,6 +736,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             4. ОПИРАЙСЯ НА ЕГО РЕАЛЬНЫЕ СОБЫТИЯ. Прямо упоминай то, о чем человек писал: «ты так переживал из-за...», «когда на тебя навалилась эта работа...», «но вспомни ту прогулку...», «тот чай...». Никаких пустых абстрактных фраз, которые можно сказать кому угодно.
             5. ПОДМЕЧАЙ ЕГО ТИХИЕ ПОБЕДЫ. Даже если дни были полным кошмаром, найди, где человек держался молодцом, не сдался, дал себе передышку или честно признался себе в усталости. Покажи ему, как сильно ты им гордишься.
             6. ДАЙ 2-3 ТЕПЛЫХ ДРУЖЕСКИХ СОВЕТА. Без нравоучений, просто как советует заботливый друг: «давай ты сегодня выспишься», «может, отключишь чаты на вечер?».
+            7. МУЗЫКА И САУНДТРЕК ДНЯ: Если у записи есть саундтрек дня, обрати на него внимание. Музыка — прямое отражение души. Подметь, как этот трек помогал прожить момент, успокоиться или выплеснуть эмоции.
 
             СТАТИСТИКА:
             - Записей: ${entries.size}
@@ -734,6 +771,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             - Strictly NO clinical or psychological jargon (no "cognitive distortion", "adaptive patterns", etc.).
             - Mention concrete events and feelings from their notes.
             - Celebrate quiet wins and resilience.
+            - If a soundtrack of the day is present, warmly connect the music they listened to with their thoughts and feelings.
             - Give 2-3 caring, practical suggestions without preachiness.
 
             ENTRIES:

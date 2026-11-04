@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,8 +74,25 @@ fun CalendarTab(
     ) {
         // 1. Month Header Card + Mood Calendar Grid
         item {
+            var calendarDragX by remember { mutableFloatStateOf(0f) }
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(calendarYear, calendarMonthZeroBased) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (calendarDragX < -50f) {
+                                    onNextMonth()
+                                } else if (calendarDragX > 50f) {
+                                    onPreviousMonth()
+                                }
+                                calendarDragX = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                calendarDragX += dragAmount
+                            }
+                        )
+                    },
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),

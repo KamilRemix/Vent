@@ -82,9 +82,20 @@ class LetterUnlockWorker(
             "Your letter from $formattedDate is now unlocked and ready to read in Vent."
         }
 
+        val largeIcon = try {
+            android.graphics.BitmapFactory.decodeResource(applicationContext.resources, R.drawable.ic_vent_logo)
+        } catch (_: Exception) {
+            null
+        }
+
         val notification = NotificationCompat.Builder(applicationContext, VENT_LETTERS_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(notifTitle)
+            .setSmallIcon(R.drawable.ic_notification_vent)
+            .apply {
+                if (largeIcon != null) {
+                    setLargeIcon(largeIcon)
+                }
+            }
+            .setContentTitle("Vent • $notifTitle")
             .setContentText(notifBody)
             .setStyle(NotificationCompat.BigTextStyle().bigText(notifBody))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

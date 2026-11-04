@@ -148,7 +148,8 @@ data class DiaryEntry(
         return moods
     }
 
-    fun displayTags(): List<String> = tags.filter { !it.startsWith("mood:") }
+    fun musicTrack(): String? = tags.firstOrNull { it.startsWith("music:") }?.removePrefix("music:")?.takeIf { it.isNotBlank() }
+    fun displayTags(): List<String> = tags.filter { !it.startsWith("mood:") && !it.startsWith("music:") }
     fun isFutureLetter(): Boolean =
         id.startsWith("capsule_") || reflectionPrompt?.startsWith("WRITTEN_AT:") == true
 

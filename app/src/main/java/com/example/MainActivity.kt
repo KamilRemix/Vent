@@ -82,8 +82,11 @@ enum class MainDestination(
 }
 
 class MainActivity : ComponentActivity() {
+    private var pendingLetterId by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingLetterId = intent?.getStringExtra("unlocked_letter_id")
         configureAppCheck(this, intent)
         // Initialize language preference from phone locale (or user choice) before creating notification channel
         LanguagePreferences(this).getResolvedLanguage()
@@ -91,15 +94,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                BotanicalDiaryApp()
+                BotanicalDiaryApp(initialLetterId = pendingLetterId)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingLetterId = intent.getStringExtra("unlocked_letter_id")
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BotanicalDiaryApp() {
+fun BotanicalDiaryApp(initialLetterId: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
@@ -263,6 +272,17 @@ fun BotanicalDiaryApp() {
         var readingFutureLetter by remember { mutableStateOf<DiaryEntry?>(null) }
         var showPinSetupDialog by remember { mutableStateOf(false) }
         var isSettingsOpen by remember { mutableStateOf(false) }
+
+        // Handle deep-link to an unlocked letter from notification click
+        LaunchedEffect(initialLetterId, futureLetters) {
+            if (!initialLetterId.isNullOrBlank()) {
+                val found = futureLetters.firstOrNull { it.id == initialLetterId }
+                if (found != null) {
+                    currentTab = MainDestination.LETTERS
+                    readingFutureLetter = found
+                }
+            }
+        }
 
         val snackbarHostState = remember { SnackbarHostState() }
 

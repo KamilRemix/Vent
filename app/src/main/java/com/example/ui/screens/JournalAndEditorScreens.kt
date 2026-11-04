@@ -10,6 +10,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -27,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
@@ -45,6 +49,8 @@ import com.example.util.AppLanguage
 import com.example.util.DateAndPhotoUtils
 import com.example.util.LocalAppLanguage
 import com.example.util.tr
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun JournalHomeTab(
@@ -63,6 +69,20 @@ fun JournalHomeTab(
     onSelectDate: (String) -> Unit = {}
 ) {
     val lang = LocalAppLanguage.current
+    val todayIso = remember { DateAndPhotoUtils.todayIso() }
+    val canGoForward = selectedDateIso < todayIso
+    val shiftDate = { days: Int ->
+        try {
+            val cal = DateAndPhotoUtils.parseIsoToCalendar(selectedDateIso)
+            cal.add(Calendar.DAY_OF_YEAR, days)
+            val shifted = String.format(Locale.US, "%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+            if (shifted <= todayIso) {
+                onSelectDate(shifted)
+            }
+        } catch (_: Exception) {}
+    }
+    var dayDragX by remember { mutableFloatStateOf(0f) }
+
     val latestMood = entriesForSelectedDate.firstOrNull()?.botanicalMood()
         ?: entries.firstOrNull()?.botanicalMood()
         ?: BotanicalMood.CALM_LEAF
@@ -74,10 +94,26 @@ fun JournalHomeTab(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        // 1. Clean Hero Summary Banner
+        // 1. Clean Hero Summary Banner with Day Navigation & Swipe
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(selectedDateIso) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (dayDragX < -50f && canGoForward) {
+                                    shiftDate(1)
+                                } else if (dayDragX > 50f) {
+                                    shiftDate(-1)
+                                }
+                                dayDragX = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                dayDragX += dragAmount
+                            }
+                        )
+                    },
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -85,23 +121,23 @@ fun JournalHomeTab(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(168.dp)
+                        .height(176.dp)
                 ) {
                     BotanicalHeroArtCard(
                         modifier = Modifier.fillMaxSize(),
-                        height = 168.dp
+                        height = 176.dp
                     )
 
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(20.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(50),
@@ -112,16 +148,50 @@ fun JournalHomeTab(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                                 )
                             }
 
-                            Text(
-                                text = DateAndPhotoUtils.formatFullDate(selectedDateIso, lang),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold
-                            )
+                            // Day navigation bar with < Date >
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { shiftDate(-1) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                        contentDescription = tr("Previous day", "Предыдущий день"),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = DateAndPhotoUtils.formatFullDate(selectedDateIso, lang),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                IconButton(
+                                    onClick = { shiftDate(1) },
+                                    enabled = canGoForward,
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = tr("Next day", "Следующий день"),
+                                        tint = if (canGoForward) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+
                             val moodTitle = latestMood.localizedTitle(lang)
                             val moodSub = latestMood.localizedSubtitle(lang)
                             Text(
@@ -133,24 +203,24 @@ fun JournalHomeTab(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
 
                             OutlinedButton(
                                 onClick = onOpenCalendar,
                                 shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier
-                                    .heightIn(min = 38.dp)
+                                    .heightIn(min = 34.dp)
                                     .testTag("hero_calendar_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.CalendarMonth,
-                                    contentDescription = tr("Change Date", "Выбрать дату"),
-                                    modifier = Modifier.size(16.dp)
+                                    contentDescription = tr("All Dates", "Все даты"),
+                                    modifier = Modifier.size(15.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    tr("Change Date", "Выбрать дату"),
+                                    tr("All Dates", "Все даты"),
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             }
@@ -681,6 +751,37 @@ fun DiaryEntryCard(
                 }
             }
 
+            // Soundtrack of the day
+            val music = entry.musicTrack()
+            if (!music.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = music,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
             // Photo strip (rendered from Firebase Storage downloadUrls via Coil AsyncImage)
             if (entry.photoUrls.isNotEmpty()) {
                 LazyRow(
@@ -938,6 +1039,54 @@ fun DiaryEntryReaderScreen(
                 }
             }
 
+            // 2b. Soundtrack of the Day
+            val readerMusicTrack = entry.musicTrack()
+            if (!readerMusicTrack.isNullOrBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = tr("Soundtrack of the day", "Саундтрек этого дня"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = readerMusicTrack,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
             // 3. Reflection Prompt & Answer (if filled)
             if (!entry.reflectionAnswer.isNullOrBlank()) {
                 Card(
@@ -1143,6 +1292,7 @@ fun DiaryEntryEditorScreen(
         mutableStateOf(initialEntry?.reflectionAnswer ?: "")
     }
     var tags by remember(initialEntry) { mutableStateOf(initialEntry?.displayTags() ?: emptyList()) }
+    var musicTrackInput by remember(initialEntry) { mutableStateOf(initialEntry?.musicTrack() ?: "") }
     var newTagInput by remember { mutableStateOf("") }
     var photoUrls by remember(initialEntry) { mutableStateOf(initialEntry?.photoUrls ?: emptyList()) }
     var showPromptSheet by remember { mutableStateOf(false) }
@@ -1208,7 +1358,8 @@ fun DiaryEntryEditorScreen(
                         onClick = {
                             val primaryMood = selectedMoods.firstOrNull() ?: BotanicalMood.CALM_LEAF
                             val extraMoodTags = selectedMoods.drop(1).map { "mood:${it.key}" }
-                            val combinedTags = (tags.filter { !it.startsWith("mood:") } + extraMoodTags).take(15)
+                            val musicTag = musicTrackInput.trim().takeIf { it.isNotBlank() }?.let { listOf("music:${it.take(80)}") } ?: emptyList()
+                            val combinedTags = (tags.filter { !it.startsWith("mood:") && !it.startsWith("music:") } + extraMoodTags + musicTag).take(15)
                             onSave(
                                 initialEntry?.id,
                                 effectiveDateIso,
@@ -1472,6 +1623,33 @@ fun DiaryEntryEditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("editor_gratitude_input")
+            )
+
+            // 4b. Soundtrack of the Day (Optional)
+            OutlinedTextField(
+                value = musicTrackInput,
+                onValueChange = { musicTrackInput = it.take(80) },
+                label = { Text(tr("Soundtrack of the day (optional)", "Саундтрек дня (по желанию)")) },
+                placeholder = {
+                    Text(
+                        tr(
+                            "e.g., Deftones — Change, or a song on your mind...",
+                            "Например: Deftones — Change, или песня на уме..."
+                        )
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("editor_soundtrack_input")
             )
 
             // 5. Photos Section (WebP compressed & uploaded to Firebase Storage)
