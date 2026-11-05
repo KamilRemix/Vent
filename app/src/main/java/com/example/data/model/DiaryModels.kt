@@ -148,8 +148,19 @@ data class DiaryEntry(
         return moods
     }
 
+    companion object {
+        fun isSystemTag(tag: String): Boolean {
+            val lower = tag.trim().lowercase()
+            return lower.startsWith("mood:") ||
+                lower.startsWith("music:") ||
+                lower == "future_letter" ||
+                lower.startsWith("capsule_") ||
+                lower.startsWith("system:")
+        }
+    }
+
     fun musicTrack(): String? = tags.firstOrNull { it.startsWith("music:") }?.removePrefix("music:")?.takeIf { it.isNotBlank() }
-    fun displayTags(): List<String> = tags.filter { !it.startsWith("mood:") && !it.startsWith("music:") }
+    fun displayTags(): List<String> = tags.filterNot { isSystemTag(it) }
     fun isFutureLetter(): Boolean =
         id.startsWith("capsule_") || reflectionPrompt?.startsWith("WRITTEN_AT:") == true
 

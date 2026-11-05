@@ -434,7 +434,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         val dominantMood = periodEntries.groupBy { it.mood() }
             .maxByOrNull { it.value.size }?.key ?: BotanicalMood.CALM_LEAF
         val avgIntensity = periodEntries.map { it.moodIntensity }.average().toFloat()
-        val topTags = periodEntries.flatMap { it.tags }
+        val topTags = periodEntries.flatMap { it.displayTags() }
             .groupBy { it }
             .entries.sortedByDescending { it.value.size }
             .take(6)
@@ -828,7 +828,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             entriesCount = entriesCount,
             averageIntensity = avgIntensity,
             dominantMoodKey = dominantMoodKey,
-            topTags = topTags,
+            topTags = topTags.filterNot { DiaryEntry.isSystemTag(it) },
             weekdayBreakdown = weekdayBreakdown,
             createdAtMillis = System.currentTimeMillis(),
             aiModelBadge = "Gemini • Firebase AI Logic"
@@ -919,7 +919,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             entriesCount = obj.optInt("entriesCount", 0),
             averageIntensity = obj.optDouble("averageIntensity", 0.0).toFloat(),
             dominantMoodKey = obj.optString("dominantMoodKey", BotanicalMood.CALM_LEAF.name),
-            topTags = jsonArrayToList(obj.optJSONArray("topTags")),
+            topTags = jsonArrayToList(obj.optJSONArray("topTags")).filterNot { DiaryEntry.isSystemTag(it) },
             weekdayBreakdown = weekdays,
             createdAtMillis = obj.optLong("createdAtMillis", System.currentTimeMillis()),
             aiModelBadge = obj.optString("aiModelBadge", "Gemini 2.5 Flash • Google AI")

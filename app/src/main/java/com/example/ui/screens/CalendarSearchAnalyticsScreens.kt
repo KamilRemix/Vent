@@ -428,12 +428,13 @@ fun SearchAndTagsTab(
                     }
                 }
 
-                if (allTags.isNotEmpty()) {
+                val cleanTags = remember(allTags) { allTags.filterNot { DiaryEntry.isSystemTag(it) } }
+                if (cleanTags.isNotEmpty()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        allTags.forEach { tag ->
+                        cleanTags.forEach { tag ->
                             val selected = selectedTagFilter == tag
                             FilterChip(
                                 selected = selected,

@@ -179,9 +179,9 @@ class DiaryViewModel(
                 entry.title.lowercase().contains(q) ||
                 entry.content.lowercase().contains(q) ||
                 entry.reflectionAnswer.orEmpty().lowercase().contains(q) ||
-                entry.tags.any { it.lowercase().contains(q) } ||
+                entry.displayTags().any { it.lowercase().contains(q) } ||
                 entry.dateIso.contains(q)
-            val matchesTag = tag == null || entry.tags.any { it.equals(tag, ignoreCase = true) }
+            val matchesTag = tag == null || entry.displayTags().any { it.equals(tag, ignoreCase = true) }
             val matchesMood = mood == null || entry.moodKey == mood.key
             matchesQuery && matchesTag && matchesMood
         }
@@ -209,7 +209,7 @@ class DiaryViewModel(
 
                 val tagFreq = mutableMapOf<String, Int>()
                 entries.forEach { entry ->
-                    entry.tags.forEach { tag ->
+                    entry.displayTags().forEach { tag ->
                         val clean = tag.lowercase()
                         tagFreq[clean] = (tagFreq[clean] ?: 0) + 1
                     }

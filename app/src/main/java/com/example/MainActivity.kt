@@ -236,7 +236,7 @@ fun BotanicalDiaryApp(initialLetterId: String? = null) {
             entries.filter { it.monthDay == targetMonthDay && !it.dateIso.startsWith(targetYear) }
         }
         val allTags = remember(entries) {
-            entries.flatMap { it.tags }.distinct().sorted()
+            entries.flatMap { it.displayTags() }.distinct().sorted()
         }
         val todayIso = remember { DateAndPhotoUtils.todayIso() }
         val availableAiPeriods = remember(entries, todayIso, selectedDateIso) {
