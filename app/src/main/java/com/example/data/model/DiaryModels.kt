@@ -148,17 +148,6 @@ data class DiaryEntry(
         return moods
     }
 
-    companion object {
-        fun isSystemTag(tag: String): Boolean {
-            val lower = tag.trim().lowercase()
-            return lower.startsWith("mood:") ||
-                lower.startsWith("music:") ||
-                lower == "future_letter" ||
-                lower.startsWith("capsule_") ||
-                lower.startsWith("system:")
-        }
-    }
-
     fun musicTrack(): String? = tags.firstOrNull { it.startsWith("music:") }?.removePrefix("music:")?.takeIf { it.isNotBlank() }
     fun displayTags(): List<String> = tags.filterNot { isSystemTag(it) }
     fun isFutureLetter(): Boolean =
@@ -202,6 +191,15 @@ data class DiaryEntry(
     }
 
     companion object {
+        fun isSystemTag(tag: String): Boolean {
+            val lower = tag.trim().lowercase()
+            return lower.startsWith("mood:") ||
+                lower.startsWith("music:") ||
+                lower == "future_letter" ||
+                lower.startsWith("capsule_") ||
+                lower.startsWith("system:")
+        }
+
         fun buildFutureLetterMetadata(writtenDateIso: String, hour: Int, minute: Int): String {
             val h = hour.coerceIn(0, 23)
             val m = minute.coerceIn(0, 59)

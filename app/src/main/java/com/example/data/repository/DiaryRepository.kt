@@ -27,6 +27,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+private const val KEY_LOCAL_ENTRIES_JSON = "local_entries_json"
+private const val KEY_PENDING_SYNC_JSON = "pending_sync_entries_json"
+
 class DiaryRepository(
     private val db: FirebaseFirestore,
     private val appContext: Context? = null
@@ -389,18 +392,6 @@ class DiaryRepository(
             Result.failure(e)
         }
     }
-                    DiaryEntry::class.java,
-                    DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                )
-            }.sortedByDescending { it.dateIso }
-            Result.success(list)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.LIST, path)
-            Result.failure(e)
-        }
-    }
 
     suspend fun getEntryById(ownerUid: String, entryId: String): Result<DiaryEntry?> {
         if (isGuestMode(ownerUid)) {
@@ -557,10 +548,5 @@ class DiaryRepository(
             } catch (_: Exception) {}
         }
         return Result.success(currentGuest.size)
-    }
-
-    private companion object {
-        const val KEY_LOCAL_ENTRIES_JSON = "local_entries_json"
-        const val KEY_PENDING_SYNC_JSON = "pending_sync_entries_json"
     }
 }
