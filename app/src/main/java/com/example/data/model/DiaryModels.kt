@@ -88,6 +88,39 @@ enum class BotanicalMood(
         primaryColorHex = 0xFF6E6259,
         softBgHex = 0xFFEDE8E3,
         accentHex = 0xFF9C8E83
+    ),
+    WILDFIRE(
+        key = "WILDFIRE",
+        titleEn = "Anger",
+        subtitleEn = "Frustration & fire",
+        titleRu = "Гнев",
+        subtitleRu = "Злость и ярость",
+        defaultIntensity = 5,
+        primaryColorHex = 0xFFC04B3E,
+        softBgHex = 0xFFFBECEB,
+        accentHex = 0xFFDC685A
+    ),
+    CHAOS_WIND(
+        key = "CHAOS_WIND",
+        titleEn = "Overwhelmed",
+        subtitleEn = "Mental chaos",
+        titleRu = "Перегруз",
+        subtitleRu = "Хаос в голове",
+        defaultIntensity = 4,
+        primaryColorHex = 0xFF6D597A,
+        softBgHex = 0xFFECE7F0,
+        accentHex = 0xFF957DAD
+    ),
+    ASH_MIST(
+        key = "ASH_MIST",
+        titleEn = "Numbness",
+        subtitleEn = "Empty & detached",
+        titleRu = "Опустошение",
+        subtitleRu = "Пустота и онемение",
+        defaultIntensity = 2,
+        primaryColorHex = 0xFF64748B,
+        softBgHex = 0xFFECEFF2,
+        accentHex = 0xFF94A3B8
     );
 
     val title: String

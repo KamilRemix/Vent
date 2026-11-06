@@ -44,6 +44,7 @@ import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
 import com.example.data.model.ReflectionPrompts
 import com.example.ui.components.BotanicalHeroArtCard
+import com.example.ui.components.BotanicalMoodBottomSheet
 import com.example.ui.components.BotanicalMoodIllustration
 import com.example.util.AppLanguage
 import com.example.util.DateAndPhotoUtils
@@ -1296,6 +1297,7 @@ fun DiaryEntryEditorScreen(
     var newTagInput by remember { mutableStateOf("") }
     var photoUrls by remember(initialEntry) { mutableStateOf(initialEntry?.photoUrls ?: emptyList()) }
     var showPromptSheet by remember { mutableStateOf(false) }
+    var showMoodBottomSheet by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -1393,7 +1395,7 @@ fun DiaryEntryEditorScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // 1. Mood Selector
+            // 1. Botanical Mood Picker (Compact Card + ModalBottomSheet)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1401,103 +1403,149 @@ fun DiaryEntryEditorScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = tr("How are you feeling?", "Как вы себя чувствуете?"),
+                        text = tr("Mood & Emotion", "Эмоции и состояние"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}"),
+                        text = if (selectedMoods.isEmpty()) {
+                            tr("Tap to choose", "Выбрать")
+                        } else {
+                            tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}")
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                Text(
-                    text = tr("Tap to select multiple emotions at once", "Можно выбрать сразу несколько эмоций"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { showMoodBottomSheet = true }
+                        .testTag("open_mood_sheet_button"),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                 ) {
-                    items(BotanicalMood.entries) { mood ->
-                        val isSelected = selectedMoods.contains(mood)
-                        val cardBg by animateColorAsState(
-                            if (isSelected) mood.softBgColor
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            label = "moodBg"
-                        )
-                        Surface(
-                            modifier = Modifier
-                                .width(148.dp)
-                                .clickable {
-                                    selectedMoods = if (selectedMoods.contains(mood)) {
-                                        if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
-                                    } else {
-                                        selectedMoods + mood
-                                    }
-                                    moodIntensity = mood.defaultIntensity
-                                }
-                                .testTag("mood_option_${mood.key}"),
-                            shape = RoundedCornerShape(18.dp),
-                            color = cardBg,
-                            border = BorderStroke(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) mood.primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            )
-                        ) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                if (isSelected) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                            .size(20.dp),
-                                        shape = CircleShape,
-                                        color = mood.primaryColor
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = androidx.compose.ui.graphics.Color.White,
-                                            modifier = Modifier.padding(3.dp)
-                                        )
-                                    }
-                                }
-                                Column(
-                                    modifier = Modifier
-                                        .padding(horizontal = 12.dp, vertical = 12.dp)
-                                        .fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    BotanicalMoodIllustration(
-                                        mood = mood,
-                                        size = 42.dp,
-                                        showSoftBackground = !isSelected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (selectedMoods.isEmpty()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                BotanicalMoodIllustration(
+                                    mood = BotanicalMood.CALM_LEAF,
+                                    size = 36.dp,
+                                    showSoftBackground = true
+                                )
+                                Column {
+                                    Text(
+                                        text = tr("How are you feeling?", "Как вы себя чувствуете?"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = mood.localizedTitle(lang),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        text = mood.localizedSubtitle(lang),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1
+                                        text = tr("Tap to choose emotions...", "Нажмите, чтобы выбрать..."),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+                        } else {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                selectedMoods.take(3).forEach { mood ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = mood.softBgColor,
+                                        border = BorderStroke(1.dp, mood.primaryColor.copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            BotanicalMoodIllustration(
+                                                mood = mood,
+                                                size = 22.dp,
+                                                showSoftBackground = false
+                                            )
+                                            Text(
+                                                text = mood.localizedTitle(lang),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF2C2623)
+                                            )
+                                        }
+                                    }
+                                }
+                                if (selectedMoods.size > 3) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "+${selectedMoods.size - 3}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(7.dp)
+                                    .size(18.dp)
+                            )
                         }
                     }
                 }
+            }
+
+            if (showMoodBottomSheet) {
+                BotanicalMoodBottomSheet(
+                    selectedMoods = selectedMoods,
+                    onMoodToggle = { mood ->
+                        selectedMoods = if (selectedMoods.contains(mood)) {
+                            if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
+                        } else {
+                            selectedMoods + mood
+                        }
+                        moodIntensity = mood.defaultIntensity
+                    },
+                    onClearAll = {
+                        selectedMoods = setOf(BotanicalMood.CALM_LEAF)
+                        moodIntensity = BotanicalMood.CALM_LEAF.defaultIntensity
+                    },
+                    onDismiss = { showMoodBottomSheet = false }
+                )
             }
 
             // 2. Reflection Prompt Helper

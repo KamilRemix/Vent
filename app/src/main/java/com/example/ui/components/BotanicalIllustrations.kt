@@ -18,8 +18,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.data.model.BotanicalMood
+import com.example.util.AppLanguage
+import com.example.util.LocalAppLanguage
 
 @Composable
 fun BotanicalMoodIllustration(
@@ -73,6 +86,9 @@ fun BotanicalMoodIllustration(
                 BotanicalMood.MIST_FERN -> drawMelancholyCloud(mood.primaryColor, mood.accentColor)
                 BotanicalMood.AUTUMN_WIND -> drawAnxietyWind(mood.primaryColor, mood.accentColor)
                 BotanicalMood.WINTER_SEED -> drawTiredMoon(mood.primaryColor, mood.accentColor)
+                BotanicalMood.WILDFIRE -> drawWildfireFlame(mood.primaryColor, mood.accentColor)
+                BotanicalMood.CHAOS_WIND -> drawChaosVortex(mood.primaryColor, mood.accentColor)
+                BotanicalMood.ASH_MIST -> drawAshMist(mood.primaryColor, mood.accentColor)
             }
         }
     }
@@ -199,6 +215,267 @@ private fun DrawScope.drawTiredMoon(primary: Color, accent: Color) {
 
     // Tiny resting star dot
     drawCircle(color = accent, radius = 3.dp.toPx(), center = Offset(w * 0.74f, h * 0.42f))
+}
+
+// 7. Гнев / Злость — выразительный огненный лепесток с теплым ядром
+private fun DrawScope.drawWildfireFlame(primary: Color, accent: Color) {
+    val w = size.width
+    val h = size.height
+
+    val flame = Path().apply {
+        moveTo(w * 0.50f, h * 0.14f)
+        cubicTo(w * 0.68f, h * 0.30f, w * 0.86f, h * 0.52f, w * 0.76f, h * 0.76f)
+        cubicTo(w * 0.68f, h * 0.88f, w * 0.32f, h * 0.88f, w * 0.24f, h * 0.76f)
+        cubicTo(w * 0.14f, h * 0.52f, w * 0.32f, h * 0.30f, w * 0.50f, h * 0.14f)
+        close()
+    }
+    drawPath(flame, color = primary)
+
+    // Внутреннее светящееся ядро
+    val inner = Path().apply {
+        moveTo(w * 0.50f, h * 0.38f)
+        cubicTo(w * 0.60f, h * 0.50f, w * 0.64f, h * 0.68f, w * 0.50f, h * 0.78f)
+        cubicTo(w * 0.36f, h * 0.68f, w * 0.40f, h * 0.50f, w * 0.50f, h * 0.38f)
+        close()
+    }
+    drawPath(inner, color = accent)
+}
+
+// 8. Перегруз / Хаос — вихревые потоки и искры мыслей
+private fun DrawScope.drawChaosVortex(primary: Color, accent: Color) {
+    val w = size.width
+    val h = size.height
+
+    val swirl1 = Path().apply {
+        moveTo(w * 0.16f, h * 0.46f)
+        cubicTo(w * 0.22f, h * 0.18f, w * 0.78f, h * 0.18f, w * 0.84f, h * 0.46f)
+        cubicTo(w * 0.88f, h * 0.76f, w * 0.36f, h * 0.84f, w * 0.32f, h * 0.58f)
+        cubicTo(w * 0.30f, h * 0.42f, w * 0.62f, h * 0.40f, w * 0.64f, h * 0.54f)
+    }
+    drawPath(swirl1, color = primary, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+
+    drawCircle(color = accent, radius = 3.dp.toPx(), center = Offset(w * 0.24f, h * 0.28f))
+    drawCircle(color = accent, radius = 2.dp.toPx(), center = Offset(w * 0.76f, h * 0.70f))
+}
+
+// 9. Опустошение / Онемение — гладкий тихий камень в полосах тумана
+private fun DrawScope.drawAshMist(primary: Color, accent: Color) {
+    val w = size.width
+    val h = size.height
+
+    val mist1 = Path().apply {
+        moveTo(w * 0.14f, h * 0.34f)
+        cubicTo(w * 0.36f, h * 0.26f, w * 0.64f, h * 0.40f, w * 0.86f, h * 0.34f)
+    }
+    drawPath(mist1, color = accent, style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round))
+
+    val stone = Path().apply {
+        moveTo(w * 0.30f, h * 0.52f)
+        cubicTo(w * 0.30f, h * 0.36f, w * 0.70f, h * 0.36f, w * 0.70f, h * 0.52f)
+        cubicTo(w * 0.70f, h * 0.68f, w * 0.30f, h * 0.68f, w * 0.30f, h * 0.52f)
+        close()
+    }
+    drawPath(stone, color = primary)
+
+    val mist2 = Path().apply {
+        moveTo(w * 0.20f, h * 0.70f)
+        cubicTo(w * 0.42f, h * 0.64f, w * 0.68f, h * 0.76f, w * 0.86f, h * 0.70f)
+    }
+    drawPath(mist2, color = accent.copy(alpha = 0.75f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BotanicalMoodBottomSheet(
+    selectedMoods: Set<BotanicalMood>,
+    onMoodToggle: (BotanicalMood) -> Unit,
+    onClearAll: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val lang = LocalAppLanguage.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        },
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (lang == AppLanguage.RU) "Что на душе?" else "How are you feeling?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (lang == AppLanguage.RU) "Выберите одно или несколько состояний" else "Select one or multiple states that resonate",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (selectedMoods.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = if (lang == AppLanguage.RU) "Выбрано: ${selectedMoods.size}" else "${selectedMoods.size} selected",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // 3x3 Grid of 9 Emotions
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotanicalMood.entries.chunked(3).forEach { rowMoods ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowMoods.forEach { mood ->
+                            val isSelected = selectedMoods.contains(mood)
+                            val scale by animateFloatAsState(
+                                targetValue = if (isSelected) 1.03f else 1f,
+                                animationSpec = spring(dampingRatio = 0.7f),
+                                label = "moodSheetScale"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .scale(scale)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        if (isSelected) mood.softBgColor
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                    )
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) mood.primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                        shape = RoundedCornerShape(18.dp)
+                                    )
+                                    .clickable { onMoodToggle(mood) }
+                                    .padding(vertical = 12.dp, horizontal = 6.dp)
+                                    .testTag("sheet_mood_${mood.key}"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .background(mood.primaryColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                }
+
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    BotanicalMoodIllustration(
+                                        mood = mood,
+                                        size = 38.dp,
+                                        showSoftBackground = !isSelected
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = mood.localizedTitle(lang),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color(0xFF2C2623) else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = mood.localizedSubtitle(lang),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) Color(0xFF5A4D46) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bottom Actions: Clear & Done
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = onClearAll,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text(
+                        text = if (lang == AppLanguage.RU) "Сбросить" else "Reset to Calm",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Text(
+                        text = if (lang == AppLanguage.RU) "Готово" else "Done",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

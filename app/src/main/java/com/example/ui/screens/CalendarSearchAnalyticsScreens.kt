@@ -1085,8 +1085,8 @@ fun SettingsScreen(
                                 Text(
                                     text = if (notificationsGranted) {
                                         tr(
-                                            "Notifications enabled — Android will alert you at the exact unlock hour & minute even when Vent is closed.",
-                                            "Уведомления включены — Android пришлет пуш-уведомление в точную минуту открытия письма, даже если приложение закрыто."
+                                            "Notifications enabled — Vent will gently remind you the moment your future letter unlocks.",
+                                            "Уведомления включены — Vent бережно напомнит вам в назначенный день и минуту об открытии письма."
                                         )
                                     } else {
                                         tr(

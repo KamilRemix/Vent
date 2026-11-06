@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.data.model.BotanicalMood
 import com.example.data.model.DiaryEntry
+import com.example.ui.components.BotanicalMoodBottomSheet
 import com.example.ui.components.BotanicalMoodIllustration
 import com.example.util.DateAndPhotoUtils
 import com.example.util.LocalAppLanguage
@@ -60,6 +61,8 @@ import java.util.Calendar
 fun FutureLettersTab(
     futureLetters: List<DiaryEntry>,
     todayIso: String,
+    notificationsGranted: Boolean = true,
+    onRequestNotificationPermission: () -> Unit = {},
     onComposeLetter: () -> Unit,
     onOpenUnlockedLetter: (DiaryEntry) -> Unit,
     onDeleteLetter: (String) -> Unit
@@ -245,8 +248,8 @@ fun FutureLettersTab(
 
                         Text(
                             text = tr(
-                                "Send a message, wish, or reminder into the future. Pick the exact day and time — your letter stays sealed until that moment, and Android will send you a push notification even if the app is closed.",
-                                "Отправьте послание, мечту или напоминание в будущее. Выберите точный день и время — письмо будет запечатано до этой минуты, а Android пришлет уведомление, даже если приложение закрыто."
+                                "Send a message to your future self — dreams, encouragement, or unfiltered thoughts. Your letter will stay safely sealed until that exact day, when Vent will gently notify you.",
+                                "Отправьте послание себе в будущее — мечты, слова поддержки или честные мысли. Письмо будет бережно запечатано, а в назначенный день Vent мягко постучится к вам и откроет доступ."
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -276,6 +279,67 @@ fun FutureLettersTab(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1.5 Notification Disabled Warning Banner
+        if (!notificationsGranted) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.NotificationsActive,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("Notifications are disabled", "Уведомления отключены"),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = tr(
+                                    "Allow notifications so Vent can gently remind you the moment your letter unlocks.",
+                                    "Включите уведомления, чтобы Vent смог вовремя напомнить вам об открытии письма."
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = onRequestNotificationPermission,
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = tr("Enable", "Включить"),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -752,6 +816,7 @@ fun FutureLetterComposerScreen(
     var photoUrls by remember { mutableStateOf<List<String>>(emptyList()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showMoodBottomSheet by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -1095,7 +1160,7 @@ fun FutureLetterComposerScreen(
                 }
             }
 
-            // 2. Mood Selection
+            // 2. Botanical Mood Picker (Compact Button + ModalBottomSheet)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1108,57 +1173,133 @@ fun FutureLetterComposerScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}"),
+                        text = if (selectedMoods.isEmpty()) {
+                            tr("Tap to choose", "Выбрать")
+                        } else {
+                            tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}")
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(BotanicalMood.entries) { mood ->
-                        val isSelected = selectedMoods.contains(mood)
-                        val bgColor by animateColorAsState(
-                            if (isSelected) mood.softBgColor
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            label = "letterMoodBg"
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = bgColor,
-                            border = BorderStroke(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) mood.primaryColor
-                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            ),
-                            modifier = Modifier
-                                .clickable {
-                                    selectedMoods = if (selectedMoods.contains(mood)) {
-                                        if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
-                                    } else {
-                                        selectedMoods + mood
-                                    }
-                                }
-                                .testTag("letter_mood_${mood.key}")
-                        ) {
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { showMoodBottomSheet = true }
+                        .testTag("open_letter_mood_sheet_button"),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (selectedMoods.isEmpty()) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 BotanicalMoodIllustration(
-                                    mood = mood,
-                                    size = 26.dp,
-                                    showSoftBackground = false
+                                    mood = BotanicalMood.WARM_ROOT,
+                                    size = 36.dp,
+                                    showSoftBackground = true
                                 )
                                 Text(
-                                    text = mood.localizedTitle(lang),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    text = tr("Tap to choose emotions...", "Нажмите, чтобы выбрать..."),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        } else {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                selectedMoods.take(3).forEach { mood ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = mood.softBgColor,
+                                        border = BorderStroke(1.dp, mood.primaryColor.copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            BotanicalMoodIllustration(
+                                                mood = mood,
+                                                size = 22.dp,
+                                                showSoftBackground = false
+                                            )
+                                            Text(
+                                                text = mood.localizedTitle(lang),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = androidx.compose.ui.graphics.Color(0xFF2C2623)
+                                            )
+                                        }
+                                    }
+                                }
+                                if (selectedMoods.size > 3) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "+${selectedMoods.size - 3}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(7.dp)
+                                    .size(18.dp)
+                            )
                         }
                     }
                 }
+            }
+
+            if (showMoodBottomSheet) {
+                BotanicalMoodBottomSheet(
+                    selectedMoods = selectedMoods,
+                    onMoodToggle = { mood ->
+                        selectedMoods = if (selectedMoods.contains(mood)) {
+                            if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
+                        } else {
+                            selectedMoods + mood
+                        }
+                    },
+                    onClearAll = {
+                        selectedMoods = setOf(BotanicalMood.WARM_ROOT)
+                    },
+                    onDismiss = { showMoodBottomSheet = false }
+                )
             }
 
             // 3. Letter Subject & Content

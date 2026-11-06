@@ -1,15 +1,18 @@
 package com.example
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -157,10 +160,33 @@ fun BotanicalDiaryApp(initialLetterId: String? = null) {
         notificationsGranted = isGranted
     }
 
-    // Prompt for POST_NOTIFICATIONS permission on Android 13+ when entering the app
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsGranted) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    val requestNotificationPermission = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val activity = context as? Activity
+            val canShowDialog = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+            if (!notificationsGranted && !canShowDialog && activity != null) {
+                try {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        } else {
+            try {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -371,11 +397,7 @@ fun BotanicalDiaryApp(initialLetterId: String? = null) {
                             )
                         },
                         notificationsGranted = notificationsGranted,
-                        onRequestNotificationPermission = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                        },
+                        onRequestNotificationPermission = requestNotificationPermission,
                         onSetupOrChangePin = { showPinSetupDialog = true },
                         onDisablePin = {
                             pinPrefs.clearPin()
@@ -600,6 +622,8 @@ fun BotanicalDiaryApp(initialLetterId: String? = null) {
                                 FutureLettersTab(
                                     futureLetters = futureLetters,
                                     todayIso = todayIso,
+                                    notificationsGranted = notificationsGranted,
+                                    onRequestNotificationPermission = requestNotificationPermission,
                                     onComposeLetter = { isFutureLetterComposerOpen = true },
                                     onOpenUnlockedLetter = { letter -> readingFutureLetter = letter },
                                     onDeleteLetter = { id ->

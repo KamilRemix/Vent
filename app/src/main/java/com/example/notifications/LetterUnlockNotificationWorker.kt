@@ -1,9 +1,11 @@
 package com.example.notifications
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,6 +31,14 @@ const val VENT_LETTERS_CHANNEL_ID = "vent_letters_channel"
 private const val KEY_LETTER_ID = "letter_id"
 private const val KEY_WRITTEN_DATE_ISO = "written_date_iso"
 
+class LetterUnlockReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val letterId = intent.getStringExtra(KEY_LETTER_ID) ?: "future_letter"
+        val writtenDateIso = intent.getStringExtra(KEY_WRITTEN_DATE_ISO).orEmpty()
+        LetterUnlockNotificationHelper.showNotification(context, letterId, writtenDateIso)
+    }
+}
+
 class LetterUnlockWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -37,28 +47,35 @@ class LetterUnlockWorker(
     override suspend fun doWork(): Result {
         val letterId = inputData.getString(KEY_LETTER_ID) ?: "future_letter"
         val writtenDateIso = inputData.getString(KEY_WRITTEN_DATE_ISO).orEmpty()
+        LetterUnlockNotificationHelper.showNotification(applicationContext, letterId, writtenDateIso)
+        return Result.success()
+    }
+}
 
-        LetterUnlockScheduler.createNotificationChannel(applicationContext)
+object LetterUnlockNotificationHelper {
+
+    fun showNotification(context: Context, letterId: String, writtenDateIso: String) {
+        LetterUnlockScheduler.createNotificationChannel(context)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
-                applicationContext,
+                context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) {
-                return Result.success()
+                return
             }
         }
 
-        val lang = LanguagePreferences(applicationContext).getResolvedLanguage()
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+        val lang = LanguagePreferences(context).getResolvedLanguage()
+        val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("open_tab", "letters")
             putExtra("unlocked_letter_id", letterId)
         }
 
         val pendingIntent = PendingIntent.getActivity(
-            applicationContext,
+            context,
             letterId.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -82,20 +99,13 @@ class LetterUnlockWorker(
             "Your letter from $formattedDate is now unlocked and ready to read in Vent."
         }
 
-        val largeIcon = try {
-            android.graphics.BitmapFactory.decodeResource(applicationContext.resources, R.drawable.ic_vent_logo)
-        } catch (_: Exception) {
-            null
-        }
-
-        val notification = NotificationCompat.Builder(applicationContext, VENT_LETTERS_CHANNEL_ID)
+        // Authentic clean Android notification:
+        // - Small icon on the left & in status bar: Vent's monochrome botanical leaf logo (R.drawable.ic_notification_vent)
+        // - App name "Vent" is already shown in Android subheader, so content title is clean
+        // - No oversized redundant largeIcon on the right pushing the text down
+        val notification = NotificationCompat.Builder(context, VENT_LETTERS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_vent)
-            .apply {
-                if (largeIcon != null) {
-                    setLargeIcon(largeIcon)
-                }
-            }
-            .setContentTitle("Vent • $notifTitle")
+            .setContentTitle(notifTitle)
             .setContentText(notifBody)
             .setStyle(NotificationCompat.BigTextStyle().bigText(notifBody))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -104,12 +114,10 @@ class LetterUnlockWorker(
             .setContentIntent(pendingIntent)
             .build()
 
-        return try {
-            NotificationManagerCompat.from(applicationContext)
+        try {
+            NotificationManagerCompat.from(context)
                 .notify(letterId.hashCode(), notification)
-            Result.success()
         } catch (_: SecurityException) {
-            Result.success()
         }
     }
 }
@@ -155,16 +163,44 @@ object LetterUnlockScheduler {
 
         val rawDiff = unlockCal.timeInMillis - nowMillis
         if (!replaceExisting && rawDiff <= 0L) {
-            // Already in the past when syncing from cloud; don't schedule a duplicate worker
             return
         }
-        val delayMillis = rawDiff.coerceAtLeast(3_000L)
 
+        // 1. Exact Alarm via AlarmManager (fires at the EXACT minute without WorkManager battery batching)
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            if (alarmManager != null && rawDiff > 0L) {
+                val alarmIntent = Intent(context, LetterUnlockReceiver::class.java).apply {
+                    action = "com.example.vent.ACTION_UNLOCK_LETTER_$letterId"
+                    putExtra(KEY_LETTER_ID, letterId)
+                    putExtra(KEY_WRITTEN_DATE_ISO, writtenDateIso)
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    letterId.hashCode(),
+                    alarmIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+                        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, unlockCal.timeInMillis, pendingIntent)
+                    } else {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, unlockCal.timeInMillis, pendingIntent)
+                    }
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, unlockCal.timeInMillis, pendingIntent)
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        // 2. WorkManager as background fallback (reliable across reboots and power saving)
+        val delayMillis = rawDiff.coerceAtLeast(3_000L)
         val data = workDataOf(
             KEY_LETTER_ID to letterId,
             KEY_WRITTEN_DATE_ISO to writtenDateIso
         )
-
         val workRequest = OneTimeWorkRequestBuilder<LetterUnlockWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
             .setInputData(data)
@@ -179,6 +215,22 @@ object LetterUnlockScheduler {
     }
 
     fun cancelUnlockNotification(context: Context, letterId: String) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            if (alarmManager != null) {
+                val alarmIntent = Intent(context, LetterUnlockReceiver::class.java).apply {
+                    action = "com.example.vent.ACTION_UNLOCK_LETTER_$letterId"
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    letterId.hashCode(),
+                    alarmIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarmManager.cancel(pendingIntent)
+            }
+        } catch (_: Exception) {
+        }
         WorkManager.getInstance(context).cancelUniqueWork("unlock_letter_$letterId")
     }
 }
