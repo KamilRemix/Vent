@@ -217,28 +217,45 @@ private fun DrawScope.drawTiredMoon(primary: Color, accent: Color) {
     drawCircle(color = accent, radius = 3.dp.toPx(), center = Offset(w * 0.74f, h * 0.42f))
 }
 
-// 7. Гнев / Злость — выразительный огненный лепесток с теплым ядром
+// 7. Гнев / Злость — тройное динамичное пламя костра с искрами
 private fun DrawScope.drawWildfireFlame(primary: Color, accent: Color) {
     val w = size.width
     val h = size.height
 
-    val flame = Path().apply {
-        moveTo(w * 0.50f, h * 0.14f)
-        cubicTo(w * 0.68f, h * 0.30f, w * 0.86f, h * 0.52f, w * 0.76f, h * 0.76f)
-        cubicTo(w * 0.68f, h * 0.88f, w * 0.32f, h * 0.88f, w * 0.24f, h * 0.76f)
-        cubicTo(w * 0.14f, h * 0.52f, w * 0.32f, h * 0.30f, w * 0.50f, h * 0.14f)
+    // Тройной силуэт костра: 3 четких остроконечных языка пламени
+    val campfire = Path().apply {
+        moveTo(w * 0.28f, h * 0.76f)
+        // Левый язык пламени (подъем наружу и острие)
+        cubicTo(w * 0.20f, h * 0.62f, w * 0.22f, h * 0.46f, w * 0.30f, h * 0.38f)
+        // Спуск от левого острия к седловине перед центральным языком
+        cubicTo(w * 0.35f, h * 0.48f, w * 0.40f, h * 0.52f, w * 0.44f, h * 0.42f)
+        // Центральный высокий язык пламени (взлет к вершине)
+        cubicTo(w * 0.46f, h * 0.30f, w * 0.48f, h * 0.20f, w * 0.50f, h * 0.14f)
+        // Спуск от вершины к правой седловине
+        cubicTo(w * 0.52f, h * 0.20f, w * 0.54f, h * 0.30f, w * 0.56f, h * 0.42f)
+        // Правый язык пламени (подъем наружу и острие)
+        cubicTo(w * 0.60f, h * 0.52f, w * 0.65f, h * 0.48f, w * 0.70f, h * 0.38f)
+        // Спуск по правому внешнему контуру вниз
+        cubicTo(w * 0.78f, h * 0.46f, w * 0.80f, h * 0.62f, w * 0.72f, h * 0.76f)
+        // Округлое широкое основание костра
+        cubicTo(w * 0.62f, h * 0.84f, w * 0.38f, h * 0.84f, w * 0.28f, h * 0.76f)
         close()
     }
-    drawPath(flame, color = primary)
+    drawPath(campfire, color = primary)
 
-    // Внутреннее светящееся ядро
-    val inner = Path().apply {
-        moveTo(w * 0.50f, h * 0.38f)
-        cubicTo(w * 0.60f, h * 0.50f, w * 0.64f, h * 0.68f, w * 0.50f, h * 0.78f)
-        cubicTo(w * 0.36f, h * 0.68f, w * 0.40f, h * 0.50f, w * 0.50f, h * 0.38f)
+    // Внутренний акцентный язык теплого пламени
+    val innerFlame = Path().apply {
+        moveTo(w * 0.42f, h * 0.74f)
+        cubicTo(w * 0.40f, h * 0.62f, w * 0.46f, h * 0.48f, w * 0.50f, h * 0.42f)
+        cubicTo(w * 0.54f, h * 0.48f, w * 0.60f, h * 0.62f, w * 0.58f, h * 0.74f)
+        cubicTo(w * 0.52f, h * 0.78f, w * 0.48f, h * 0.78f, w * 0.42f, h * 0.74f)
         close()
     }
-    drawPath(inner, color = accent)
+    drawPath(innerFlame, color = accent)
+
+    // Две парящие искры над костром
+    drawCircle(color = accent, radius = 2.5.dp.toPx(), center = Offset(w * 0.64f, h * 0.20f))
+    drawCircle(color = primary, radius = 2.dp.toPx(), center = Offset(w * 0.34f, h * 0.24f))
 }
 
 // 8. Перегруз / Хаос — вихревые потоки и искры мыслей
@@ -454,7 +471,7 @@ fun BotanicalMoodBottomSheet(
                     )
                 ) {
                     Text(
-                        text = if (lang == AppLanguage.RU) "Сбросить" else "Reset to Calm",
+                        text = if (lang == AppLanguage.RU) "Сбросить всё (без эмоций)" else "Clear selection (No mood)",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

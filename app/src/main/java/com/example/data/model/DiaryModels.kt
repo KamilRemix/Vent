@@ -165,14 +165,17 @@ data class DiaryEntry(
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 ) {
+    fun hasMood(): Boolean = moodKey.isNotBlank() && moodKey != "NONE"
     fun botanicalMood(): BotanicalMood = BotanicalMood.fromKey(moodKey)
     fun mood(): BotanicalMood = botanicalMood()
 
     fun botanicalMoods(): List<BotanicalMood> {
+        if (!hasMood()) return emptyList()
         val moods = mutableListOf(botanicalMood())
         tags.forEach { tag ->
-            if (tag.startsWith("mood:")) {
-                val key = tag.removePrefix("mood:")
+            val clean = tag.trim().removePrefix("#").trim()
+            if (clean.startsWith("mood:", ignoreCase = true) || clean.startsWith("mood_", ignoreCase = true)) {
+                val key = clean.substring(5).trim()
                 BotanicalMood.entries.firstOrNull { it.key.equals(key, ignoreCase = true) }?.let {
                     if (!moods.contains(it)) moods.add(it)
                 }
@@ -225,12 +228,20 @@ data class DiaryEntry(
 
     companion object {
         fun isSystemTag(tag: String): Boolean {
-            val lower = tag.trim().lowercase()
-            return lower.startsWith("mood:") ||
-                lower.startsWith("music:") ||
-                lower == "future_letter" ||
-                lower.startsWith("capsule_") ||
-                lower.startsWith("system:")
+            val clean = tag.trim().removePrefix("#").trim().lowercase()
+            return clean == "mood" ||
+                clean.startsWith("mood:") ||
+                clean.startsWith("mood_") ||
+                clean.startsWith("mood-") ||
+                clean.startsWith("music:") ||
+                clean.startsWith("music_") ||
+                clean == "music" ||
+                clean == "future_letter" ||
+                clean.startsWith("capsule") ||
+                clean.startsWith("system:") ||
+                clean.startsWith("system_") ||
+                clean.startsWith("tag:") ||
+                clean.isBlank()
         }
 
         fun buildFutureLetterMetadata(writtenDateIso: String, hour: Int, minute: Int): String {

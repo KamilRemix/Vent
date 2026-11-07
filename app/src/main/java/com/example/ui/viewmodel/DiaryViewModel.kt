@@ -139,32 +139,39 @@ class DiaryViewModel(
             initialValue = UiState.Loading
         )
 
-    val entriesState: StateFlow<UiState<List<DiaryEntry>>> = allUserDocumentsState
-        .map { state ->
-            when (state) {
-                is UiState.Loading -> UiState.Loading
-                is UiState.Error -> state
-                is UiState.Success -> UiState.Success(state.data.filter { !it.isFutureLetter() })
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = UiState.Loading
-        )
+    // Optimistic local deletion cache for instant 0ms removal without awaiting network roundtrip
+    private val _deletedEntryIds = MutableStateFlow<Set<String>>(emptySet())
 
-    val futureLettersState: StateFlow<List<DiaryEntry>> = allUserDocumentsState
-        .map { state ->
-            (state as? UiState.Success)?.data
-                ?.filter { it.isFutureLetter() }
-                ?.sortedBy { it.dateIso }
-                .orEmpty()
+    val entriesState: StateFlow<UiState<List<DiaryEntry>>> = combine(
+        allUserDocumentsState,
+        _deletedEntryIds
+    ) { state, deletedIds ->
+        when (state) {
+            is UiState.Loading -> UiState.Loading
+            is UiState.Error -> state
+            is UiState.Success -> UiState.Success(
+                state.data.filter { !it.isFutureLetter() && !deletedIds.contains(it.id) }
+            )
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = emptyList()
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = UiState.Loading
+    )
+
+    val futureLettersState: StateFlow<List<DiaryEntry>> = combine(
+        allUserDocumentsState,
+        _deletedEntryIds
+    ) { state, deletedIds ->
+        (state as? UiState.Success)?.data
+            ?.filter { it.isFutureLetter() && !deletedIds.contains(it.id) }
+            ?.sortedBy { it.dateIso }
+            .orEmpty()
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000L),
+        initialValue = emptyList()
+    )
 
     val filteredSearchEntries: StateFlow<List<DiaryEntry>> = combine(
         entriesState,
@@ -304,7 +311,7 @@ class DiaryViewModel(
     fun saveDiaryEntry(
         existingEntryId: String?,
         dateIso: String,
-        mood: BotanicalMood,
+        mood: BotanicalMood?,
         moodIntensity: Int,
         title: String,
         content: String,
@@ -333,6 +340,9 @@ class DiaryViewModel(
             )
             _isSaving.value = false
             result.onSuccess {
+                if (!existingEntryId.isNullOrBlank()) {
+                    _deletedEntryIds.value = _deletedEntryIds.value - existingEntryId
+                }
                 _selectedDateIso.value = dateIso
                 val formatted = DateAndPhotoUtils.formatShortDate(dateIso, lang)
                 _statusBannerMessage.value = trText(
@@ -352,6 +362,8 @@ class DiaryViewModel(
     }
 
     fun deleteDiaryEntry(context: Context? = null, entryId: String, onDeleted: () -> Unit = {}) {
+        // Instant optimistic update: instantly remove from UI with 0ms lag
+        _deletedEntryIds.value = _deletedEntryIds.value + entryId
         viewModelScope.launch {
             val lang = AppLocaleHolder.currentLanguage
             val result = repository.deleteEntry(entryId)
@@ -362,6 +374,8 @@ class DiaryViewModel(
                 _statusBannerMessage.value = trText(lang, "Entry deleted", "Запись удалена")
                 onDeleted()
             }.onFailure { err ->
+                // If deletion failed catastrophically, revert optimistic removal
+                _deletedEntryIds.value = _deletedEntryIds.value - entryId
                 _statusBannerMessage.value = err.localizedMessage ?: trText(
                     lang,
                     "Failed to delete entry",
@@ -372,6 +386,8 @@ class DiaryViewModel(
     }
 
     fun clearAllEntries() {
+        val currentIds = (entriesState.value as? UiState.Success)?.data?.map { it.id }.orEmpty()
+        _deletedEntryIds.value = _deletedEntryIds.value + currentIds
         viewModelScope.launch {
             val lang = AppLocaleHolder.currentLanguage
             _isSaving.value = true
@@ -384,6 +400,7 @@ class DiaryViewModel(
                     "Все записи дневника очищены"
                 )
             }.onFailure { err ->
+                _deletedEntryIds.value = _deletedEntryIds.value - currentIds.toSet()
                 _statusBannerMessage.value = err.localizedMessage ?: trText(
                     lang,
                     "Failed to clear entries",
@@ -398,7 +415,7 @@ class DiaryViewModel(
         unlockDateIso: String,
         unlockHour: Int,
         unlockMinute: Int,
-        mood: BotanicalMood,
+        mood: BotanicalMood?,
         title: String,
         content: String,
         hopeOrGoal: String?,
@@ -420,7 +437,7 @@ class DiaryViewModel(
                 entryId = capsuleId,
                 dateIso = unlockDateIso,
                 mood = mood,
-                moodIntensity = mood.defaultIntensity,
+                moodIntensity = mood?.defaultIntensity ?: 3,
                 title = title.trim().ifBlank { defaultSubject },
                 content = content.trim(),
                 reflectionPrompt = metadata,

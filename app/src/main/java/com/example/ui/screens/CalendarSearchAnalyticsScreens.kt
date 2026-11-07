@@ -533,8 +533,10 @@ fun AnalyticsTab(
     val moodCounts = remember(entries) {
         val counts = BotanicalMood.entries.associateWith { 0 }.toMutableMap()
         entries.forEach { entry ->
-            val mood = entry.botanicalMood()
-            counts[mood] = (counts[mood] ?: 0) + 1
+            if (entry.hasMood()) {
+                val mood = entry.botanicalMood()
+                counts[mood] = (counts[mood] ?: 0) + 1
+            }
         }
         counts
     }

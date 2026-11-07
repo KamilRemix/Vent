@@ -796,7 +796,7 @@ fun FutureLetterComposerScreen(
         unlockMinute: Int,
         title: String,
         content: String,
-        mood: BotanicalMood,
+        mood: BotanicalMood?,
         photoUrls: List<String>
     ) -> Unit,
     onCancel: () -> Unit
@@ -812,7 +812,7 @@ fun FutureLetterComposerScreen(
 
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var selectedMoods by remember { mutableStateOf(setOf(BotanicalMood.WARM_ROOT)) }
+    var selectedMoods by remember { mutableStateOf(emptySet<BotanicalMood>()) }
     var photoUrls by remember { mutableStateOf<List<String>>(emptyList()) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -958,7 +958,7 @@ fun FutureLetterComposerScreen(
                                 unlockMinute,
                                 title,
                                 content,
-                                selectedMoods.firstOrNull() ?: BotanicalMood.WARM_ROOT,
+                                selectedMoods.firstOrNull(),
                                 photoUrls
                             )
                         },
@@ -1209,13 +1209,22 @@ fun FutureLetterComposerScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                BotanicalMoodIllustration(
-                                    mood = BotanicalMood.WARM_ROOT,
-                                    size = 36.dp,
-                                    showSoftBackground = true
-                                )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Spa,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                                 Text(
-                                    text = tr("Tap to choose emotions...", "Нажмите, чтобы выбрать..."),
+                                    text = tr("No emotion selected (Optional)", "Эмоция не выбрана (необязательно)"),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1290,13 +1299,13 @@ fun FutureLetterComposerScreen(
                     selectedMoods = selectedMoods,
                     onMoodToggle = { mood ->
                         selectedMoods = if (selectedMoods.contains(mood)) {
-                            if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
+                            selectedMoods - mood
                         } else {
                             selectedMoods + mood
                         }
                     },
                     onClearAll = {
-                        selectedMoods = setOf(BotanicalMood.WARM_ROOT)
+                        selectedMoods = emptySet()
                     },
                     onDismiss = { showMoodBottomSheet = false }
                 )

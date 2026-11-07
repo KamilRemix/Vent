@@ -318,6 +318,14 @@ class DiaryRepository(
             return@flow
         }
 
+        // Instant local cache emit: provide immediate offline entries without waiting for network handshake
+        val cachedLocal = loadLocalGuestEntries().filterNot { isEntryDeleted(it.id) }
+        val pending = loadPendingOfflineEntries().filterNot { isEntryDeleted(it.id) }
+        val initialList = (cachedLocal + pending).distinctBy { it.id }.sortedByDescending { it.dateIso }
+        if (initialList.isNotEmpty()) {
+            emit(initialList)
+        }
+
         syncGuestEntriesToCloudIfAny(userId)
         syncPendingCloudEntries(userId)
 
@@ -422,8 +430,8 @@ class DiaryRepository(
     suspend fun saveEntry(
         entryId: String?,
         dateIso: String,
-        mood: BotanicalMood,
-        moodIntensity: Int,
+        mood: BotanicalMood? = null,
+        moodIntensity: Int = 3,
         title: String,
         content: String,
         reflectionPrompt: String?,
@@ -451,7 +459,7 @@ class DiaryRepository(
             userId = auth.currentUser?.uid ?: PinLockPreferences.LOCAL_GUEST_UID,
             dateIso = dateIso,
             monthDay = monthDay,
-            moodKey = mood.key,
+            moodKey = mood?.key ?: "NONE",
             moodIntensity = moodIntensity.coerceIn(1, 5),
             title = title.trim().take(200),
             content = safeContent.take(10000),
@@ -502,6 +510,7 @@ class DiaryRepository(
         removePendingOfflineEntry(entryId)
         val updated = loadLocalGuestEntries().filterNot { it.id == entryId }
         persistLocalGuestEntries(updated)
+        localEntriesFlow.value = updated
 
         val uid = auth.currentUser?.uid
         if (!uid.isNullOrBlank() && uid != PinLockPreferences.LOCAL_GUEST_UID) {
@@ -525,6 +534,7 @@ class DiaryRepository(
         currentGuest.forEach { markEntryAsDeleted(it.id) }
         loadPendingOfflineEntries().forEach { markEntryAsDeleted(it.id) }
         persistLocalGuestEntries(emptyList())
+        localEntriesFlow.value = emptyList()
         offlineSyncPrefs?.edit()?.clear()?.apply()
 
         val uid = auth.currentUser?.uid

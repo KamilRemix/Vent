@@ -85,9 +85,8 @@ fun JournalHomeTab(
     }
     var dayDragX by remember { mutableFloatStateOf(0f) }
 
-    val latestMood = entriesForSelectedDate.firstOrNull()?.botanicalMood()
-        ?: entries.firstOrNull()?.botanicalMood()
-        ?: BotanicalMood.CALM_LEAF
+    val latestMood = entriesForSelectedDate.firstOrNull { it.hasMood() }?.botanicalMood()
+        ?: entries.firstOrNull { it.hasMood() }?.botanicalMood()
 
     LazyColumn(
         modifier = Modifier
@@ -194,16 +193,27 @@ fun JournalHomeTab(
                                 }
                             }
 
-                            val moodTitle = latestMood.localizedTitle(lang)
-                            val moodSub = latestMood.localizedSubtitle(lang)
-                            Text(
-                                text = tr(
-                                    "Mood: $moodTitle — $moodSub",
-                                    "Настроение: $moodTitle — $moodSub"
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (latestMood != null) {
+                                val moodTitle = latestMood.localizedTitle(lang)
+                                val moodSub = latestMood.localizedSubtitle(lang)
+                                Text(
+                                    text = tr(
+                                        "Mood: $moodTitle — $moodSub",
+                                        "Настроение: $moodTitle — $moodSub"
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    text = tr(
+                                        "A peaceful space for your thoughts",
+                                        "Тихое пространство для ваших мыслей"
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(2.dp))
 
@@ -229,7 +239,7 @@ fun JournalHomeTab(
                         }
 
                         BotanicalMoodIllustration(
-                            mood = latestMood,
+                            mood = latestMood ?: BotanicalMood.CALM_LEAF,
                             size = 64.dp
                         )
                     }
@@ -331,7 +341,7 @@ fun JournalHomeTab(
             }
         }
 
-        if (isLoading) {
+        if (isLoading && entries.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -367,7 +377,7 @@ fun JournalHomeTab(
             }
         }
 
-        if (errorMessage != null) {
+        if (errorMessage != null && entries.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -637,7 +647,8 @@ fun DiaryEntryCard(
     onClick: () -> Unit
 ) {
     val lang = LocalAppLanguage.current
-    val mood = entry.botanicalMood()
+    val hasMood = entry.hasMood()
+    val mood = if (hasMood) entry.botanicalMood() else null
 
     Card(
         modifier = Modifier
@@ -661,10 +672,27 @@ fun DiaryEntryCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                BotanicalMoodIllustration(
-                    mood = mood,
-                    size = 46.dp
-                )
+                if (mood != null) {
+                    BotanicalMoodIllustration(
+                        mood = mood,
+                        size = 46.dp
+                    )
+                } else {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Spa,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
@@ -945,65 +973,68 @@ fun DiaryEntryReaderScreen(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // 1. Mood Header Banner
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = mood.softBgColor),
-                border = BorderStroke(1.dp, mood.primaryColor.copy(alpha = 0.35f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+            // 1. Mood Header Banner (Only shown if mood was selected)
+            if (entry.hasMood()) {
+                val mood = entry.botanicalMood()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = mood.softBgColor),
+                    border = BorderStroke(1.dp, mood.primaryColor.copy(alpha = 0.35f))
                 ) {
-                    BotanicalMoodIllustration(
-                        mood = mood,
-                        size = 52.dp,
-                        showSoftBackground = false
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = tr("MOOD OF THE DAY", "НАСТРОЕНИЕ ДНЯ"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = mood.primaryColor,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        BotanicalMoodIllustration(
+                            mood = mood,
+                            size = 52.dp,
+                            showSoftBackground = false
                         )
-                        Text(
-                            text = entry.botanicalMoods().joinToString(" • ") { it.localizedTitle(lang) },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        val allMoods = entry.botanicalMoods()
-                        if (allMoods.size > 1) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                allMoods.forEach { m ->
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = m.softBgColor
-                                    ) {
-                                        Text(
-                                            text = m.localizedTitle(lang),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = m.primaryColor,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("MOOD OF THE DAY", "НАСТРОЕНИЕ ДНЯ"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = mood.primaryColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = entry.botanicalMoods().joinToString(" • ") { it.localizedTitle(lang) },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            val allMoods = entry.botanicalMoods()
+                            if (allMoods.size > 1) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    allMoods.forEach { m ->
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = m.softBgColor
+                                        ) {
+                                            Text(
+                                                text = m.localizedTitle(lang),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = m.primaryColor,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                 }
+                            } else {
+                                Text(
+                                    text = mood.localizedSubtitle(lang),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                        } else {
-                            Text(
-                                text = mood.localizedSubtitle(lang),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -1259,7 +1290,7 @@ fun DiaryEntryEditorScreen(
     onSave: (
         existingId: String?,
         dateIso: String,
-        mood: BotanicalMood,
+        mood: BotanicalMood?,
         moodIntensity: Int,
         title: String,
         content: String,
@@ -1278,7 +1309,7 @@ fun DiaryEntryEditorScreen(
     var title by remember(initialEntry) { mutableStateOf(initialEntry?.title ?: "") }
     var content by remember(initialEntry) { mutableStateOf(initialEntry?.content ?: "") }
     var selectedMoods by remember(initialEntry) {
-        val list = initialEntry?.botanicalMoods() ?: listOf(BotanicalMood.CALM_LEAF)
+        val list = initialEntry?.botanicalMoods() ?: emptyList()
         mutableStateOf(list.toSet())
     }
     val primarySelectedMood = selectedMoods.firstOrNull() ?: BotanicalMood.CALM_LEAF
@@ -1359,10 +1390,10 @@ fun DiaryEntryEditorScreen(
                     }
                     Button(
                         onClick = {
-                            val primaryMood = selectedMoods.firstOrNull() ?: BotanicalMood.CALM_LEAF
-                            val extraMoodTags = selectedMoods.drop(1).map { "mood:${it.key}" }
+                            val primaryMood = selectedMoods.firstOrNull()
+                            val extraMoodTags = if (selectedMoods.size > 1) selectedMoods.drop(1).map { "mood:${it.key}" } else emptyList()
                             val musicTag = musicTrackInput.trim().takeIf { it.isNotBlank() }?.let { listOf("music:${it.take(80)}") } ?: emptyList()
-                            val combinedTags = (tags.filter { !it.startsWith("mood:") && !it.startsWith("music:") } + extraMoodTags + musicTag).take(15)
+                            val combinedTags = (tags.filterNot { DiaryEntry.isSystemTag(it) } + extraMoodTags + musicTag).take(15)
                             onSave(
                                 initialEntry?.id,
                                 effectiveDateIso,
@@ -1404,14 +1435,14 @@ fun DiaryEntryEditorScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = tr("Mood & Emotion", "Эмоции и состояние"),
+                        text = tr("Mood & Emotion (Optional)", "Эмоции и состояние (Необязательно)"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = if (selectedMoods.isEmpty()) {
-                            tr("Tap to choose", "Выбрать")
+                            tr("Optional", "Необязательно")
                         } else {
                             tr("${selectedMoods.size} selected", "Выбрано: ${selectedMoods.size}")
                         },
@@ -1446,20 +1477,29 @@ fun DiaryEntryEditorScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                BotanicalMoodIllustration(
-                                    mood = BotanicalMood.CALM_LEAF,
-                                    size = 36.dp,
-                                    showSoftBackground = true
-                                )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Spa,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                                 Column {
                                     Text(
-                                        text = tr("How are you feeling?", "Как вы себя чувствуете?"),
+                                        text = tr("No emotion selected (Optional)", "Эмоция не выбрана (необязательно)"),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = tr("Tap to choose emotions...", "Нажмите, чтобы выбрать..."),
+                                        text = tr("Tap to choose, or leave blank", "Нажмите, чтобы выбрать, или оставьте пустым"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1535,15 +1575,15 @@ fun DiaryEntryEditorScreen(
                     selectedMoods = selectedMoods,
                     onMoodToggle = { mood ->
                         selectedMoods = if (selectedMoods.contains(mood)) {
-                            if (selectedMoods.size > 1) selectedMoods - mood else selectedMoods
+                            selectedMoods - mood
                         } else {
                             selectedMoods + mood
                         }
                         moodIntensity = mood.defaultIntensity
                     },
                     onClearAll = {
-                        selectedMoods = setOf(BotanicalMood.CALM_LEAF)
-                        moodIntensity = BotanicalMood.CALM_LEAF.defaultIntensity
+                        selectedMoods = emptySet()
+                        moodIntensity = 3
                     },
                     onDismiss = { showMoodBottomSheet = false }
                 )
