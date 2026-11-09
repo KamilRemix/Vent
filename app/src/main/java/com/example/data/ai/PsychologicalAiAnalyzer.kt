@@ -457,6 +457,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         val prompt = buildPsychologistPrompt(
             period = period,
             entries = periodEntries,
+            allEntries = allEntries,
             dominantMood = dominantMood,
             avgIntensity = avgIntensity,
             topTags = topTags,
@@ -695,6 +696,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
     private fun buildPsychologistPrompt(
         period: AvailableAnalysisPeriod,
         entries: List<DiaryEntry>,
+        allEntries: List<DiaryEntry> = emptyList(),
         dominantMood: BotanicalMood,
         avgIntensity: Float,
         topTags: List<String>,
@@ -704,8 +706,39 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         val isRu = lang == AppLanguage.RU
         val entriesText = buildString {
             entries.forEachIndexed { i, e ->
-                appendLine("Запись #${i + 1} [Дата: ${e.dateIso}]:")
-                appendLine("  Настроение: ${e.mood().titleRu} | Интенсивность: ${e.moodIntensity}/5")
+                val timeLabel = e.createdAt?.toDate()?.let { date ->
+                    val cal = Calendar.getInstance().apply { time = date }
+                    val hour = cal.get(Calendar.HOUR_OF_DAY)
+                    val minute = cal.get(Calendar.MINUTE)
+                    val timeStr = String.format(Locale.US, "%02d:%02d", hour, minute)
+                    when (hour) {
+                        in 0..4 -> if (isRu) "Глубокая ночь ($timeStr) — фаза ночных руминаций и усталости" else "Late Night ($timeStr) — tired prefrontal cortex & rumination phase"
+                        in 5..10 -> if (isRu) "Утро ($timeStr) — намерения и настрой" else "Morning ($timeStr) — fresh intentions"
+                        in 11..16 -> if (isRu) "День ($timeStr) — рабочая нагрузка" else "Daytime ($timeStr) — active load"
+                        in 17..22 -> if (isRu) "Вечер ($timeStr) — подведение итогов" else "Evening ($timeStr) — wind-down reflection"
+                        else -> if (isRu) "Поздний вечер ($timeStr)" else "Late Evening ($timeStr)"
+                    }
+                } ?: (if (isRu) "Время не зафиксировано" else "Time not specified")
+
+                val wordCount = e.content.trim().split("\\s+".toRegex()).count { it.isNotBlank() }
+                val ventingType = when {
+                    wordCount > 150 -> if (isRu) "Объёмный выплеск ($wordCount слов)" else "Deep venting stream ($wordCount words)"
+                    wordCount > 50 -> if (isRu) "Осознанная заметка ($wordCount слов)" else "Thoughtful entry ($wordCount words)"
+                    else -> if (isRu) "Краткая мысль ($wordCount слов)" else "Brief note ($wordCount words)"
+                }
+
+                appendLine("Запись #${i + 1} [Дата: ${e.dateIso} | $timeLabel | $ventingType]:")
+                val moodTitle = if (e.hasMood()) {
+                    if (isRu) "${e.botanicalMood().titleRu} (${e.botanicalMood().subtitleRu})" else "${e.botanicalMood().titleEn} (${e.botanicalMood().subtitleEn})"
+                } else {
+                    if (isRu) "Без выбора настроения (чистый поток мыслей)" else "No mood selected (unfiltered raw thoughts)"
+                }
+                appendLine("  Состояние: $moodTitle | Интенсивность: ${e.moodIntensity}/5")
+                val extraMoods = e.botanicalMoods().drop(1)
+                if (extraMoods.isNotEmpty()) {
+                    val extraTitles = extraMoods.joinToString(", ") { if (isRu) it.titleRu else it.titleEn }
+                    appendLine("  Сопутствующие эмоции: $extraTitles")
+                }
                 val track = e.musicTrack()
                 if (!track.isNullOrBlank()) {
                     appendLine("  Саундтрек дня / музыка: $track")
@@ -724,19 +757,60 @@ class PsychologicalAiAnalyzer(private val context: Context) {
         val weekdaySummary = weekdayBreakdown.filter { it.entriesCount > 0 }
             .joinToString("; ") { "${it.fullLabel(lang)}: записей=${it.entriesCount}, ср.интенсивность=${String.format(Locale.US, "%.1f", it.averageIntensity)}" }
 
+        val resilienceContext = buildString {
+            if (allEntries.size > entries.size) {
+                val older = allEntries.filter { it.dateIso < (entries.firstOrNull()?.dateIso ?: "") }
+                if (older.isNotEmpty()) {
+                    val prevAvg = older.map { it.moodIntensity }.average().toFloat()
+                    val prevHeavyDays = older.count { it.moodKey in listOf("WILDFIRE", "CHAOS_WIND", "MELANCHOLY_RAIN", "ASH_MIST") }
+                    val currentHeavyDays = entries.count { it.moodKey in listOf("WILDFIRE", "CHAOS_WIND", "MELANCHOLY_RAIN", "ASH_MIST") }
+                    if (isRu) {
+                        appendLine("ДИНАМИКА ВОССТАНОВЛЕНИЯ И ПРОШЛЫЙ ОПЫТ:")
+                        appendLine("- В прошлые периоды средний накал эмоций был ${String.format(Locale.US, "%.1f", prevAvg)}/5.0 (тяжёлых дней: $prevHeavyDays из ${older.size}).")
+                        appendLine("- В текущем периоде средний накал: ${String.format(Locale.US, "%.1f", avgIntensity)}/5.0 (тяжёлых дней: $currentHeavyDays из ${entries.size}).")
+                        if (currentHeavyDays <= prevHeavyDays) {
+                            appendLine("- Человек стал быстрее восстанавливаться и находить почву под ногами. Обязательно отметь этот скрытый рост устойчивости!")
+                        }
+                    } else {
+                        appendLine("RESILIENCE & RECOVERY DYNAMICS:")
+                        appendLine("- Previous baseline emotional load: ${String.format(Locale.US, "%.1f", prevAvg)}/5.0 (heavy days: $prevHeavyDays of ${older.size}).")
+                        appendLine("- Current period emotional load: ${String.format(Locale.US, "%.1f", avgIntensity)}/5.0 (heavy days: $currentHeavyDays of ${entries.size}).")
+                        if (currentHeavyDays <= prevHeavyDays) {
+                            appendLine("- Noticeable progress: faster bounce-back time and growing emotional grounding. Celebrate this inner growth!")
+                        }
+                    }
+                }
+            }
+        }
+
         return if (isRu) {
             """
-            Ты — не научная статья, не бот и не холодный терапевт. Ты — самый близкий, преданный и понимающий друг.
+            Ты находишься внутри приложения «Vent» — безопасного личного пространства, куда человек приходит выговориться, сбросить груз тяжелых мыслей, прожить свои эмоции без цензуры и страха быть осужденным.
+            Ты — не научная статья, не бот и не холодный терапевт. Ты — самый близкий, преданный и понимающий друг внутри Vent.
             Человек открыл тебе самое сокровенное — свои личные дневниковые записи за период «${period.localizedTitle(lang)}».
 
-            ГЛАВНЫЕ ПРАВИЛА ОБЩЕНИЯ:
+            ГЛАВНЫЕ ПСИХОЛОГИЧЕСКИЕ ПРИНЦИПЫ ОБЩЕНИЯ:
             1. ПИШИ КАК ЛУЧШИЙ ДРУГ. Представь, что вы сидите вдвоем на уютной кухне поздним вечером с кружкой чая, человек выговорился, а ты обнимаешь его словами, искренне слушаешь и говоришь с ним по душам.
-            2. НИКАКОГО НАУЧНОГО И МЕДИЦИНСКОГО ЗАНУДСТВА. Категорически запрещено писать сухие психологические эссе, ставить диагнозы и сыпать заумными терминами (никаких «паттернов», «когнитивных искажений», «интроектов», «дезадаптации»). Пиши простыми, живыми, человеческими словами.
+            2. НИКАКОГО НАУЧНОГО И МЕДИЦИНСКОГО ЗАНУДСТВА. Категорически запрещено писать сухие психологические эссе, ставить диагнозы и сыпать заумными терминами (никаких «когнитивных искажений», «интроектов», «дезадаптации»). Пиши простыми, живыми, человеческими словами.
             3. ОБРАЩЕНИЕ СТРОГО НА «ТЫ» — мягко, заботливо, тепло, с верой в него.
-            4. ОПИРАЙСЯ НА ЕГО РЕАЛЬНЫЕ СОБЫТИЯ. Прямо упоминай то, о чем человек писал: «ты так переживал из-за...», «когда на тебя навалилась эта работа...», «но вспомни ту прогулку...», «тот чай...». Никаких пустых абстрактных фраз, которые можно сказать кому угодно.
-            5. ПОДМЕЧАЙ ЕГО ТИХИЕ ПОБЕДЫ. Даже если дни были полным кошмаром, найди, где человек держался молодцом, не сдался, дал себе передышку или честно признался себе в усталости. Покажи ему, как сильно ты им гордишься.
-            6. ДАЙ 2-3 ТЕПЛЫХ ДРУЖЕСКИХ СОВЕТА. Без нравоучений, просто как советует заботливый друг: «давай ты сегодня выспишься», «может, отключишь чаты на вечер?».
-            7. МУЗЫКА И САУНДТРЕК ДНЯ: Если у записи есть саундтрек дня, обрати на него внимание. Музыка — прямое отражение души. Подметь, как этот трек помогал прожить момент, успокоиться или выплеснуть эмоции.
+            4. СНЯТИЕ ЧУВСТВА ВИНЫ И САМОСОСТРАДАНИЕ (Self-Compassion): Если человек ругает себя за слабость, лень или усталость — сними с него этот груз. Напомни, что он человек, а не робот, и уставать — нормально.
+            5. ДЕ-КАТАСТРОФИЗАЦИЯ БЕЗ ОБЕСЦЕНИВАНИЯ: Если в тексте звучат крайности («всё кончено», «я всё порчу», «ничего не выйдет»), мягко верни баланс, напомнив о его реальных успехах из этих же записей.
+            6. ВНИМАНИЕ К НОЧНЫМ ЗАПИСЯМ: Если запись сделана глубокой ночью (00:00-05:00), мягко подметь, что ночью мозг склонен сгущать краски, и напомни не судить о своей жизни в часы недосыпа.
+            7. ВАЛИДАЦИЯ ЗЛОСТИ И ПЕРЕГРУЗА (ACT): Не используй токсичный позитив («улыбнись, всё к лучшему»). Если человек зол — признай его право злиться: «Ты имеешь полное право так злиться, это здоровая реакция на несправедливость».
+            8. ОПИРАЙСЯ НА ЕГО РЕАЛЬНЫЕ СОБЫТИЯ. Прямо упоминай то, о чем человек писал: «ты так переживал из-за...», «когда на тебя навалилась эта работа...», «но вспомни ту прогулку...», «тот чай...». Никаких пустых абстрактных фраз.
+            9. ПОДМЕЧАЙ ЕГО ТИХИЕ ПОБЕДЫ. Даже если дни были полным кошмаром, найди, где человек держался молодцом, не сдался, дал себе передышку или честно признался себе в усталости. Покажи ему, как сильно ты им гордишься.
+            10. МУЗЫКА И САУНДТРЕК ДНЯ (БЕРЕЖНЫЙ АНАЛИЗ БЕЗ ВЫДУМОК И ГАЛЛЮЦИНАЦИЙ):
+                - Музыка — это эмоциональный камертон дня и прямой проводник к чувствам.
+                - ЕСЛИ ТЫ ЗНАЕШЬ ЭТОТ ТРЕК ИЛИ ИСПОЛНИТЕЛЯ:
+                  Подметь, какую психологическую роль сыграла музыка в тот день или ночь:
+                  * Катарсис (разрядка): тяжёлый бит, рок или надрывный вокал во время гнева/боли — как здоровый громоотвод, позволивший безопасно выпустить напряжение;
+                  * Со-регуляция (успокоение и плед): эмбиент, неоклассика, лоуфай или тихий инди — как интуитивная попытка замедлить пульс и вернуть почву под ногами;
+                  * Зеркало (проживание): меланхоличный трек, разделяющий тишину ночи — когда песня сидит рядом и не требует притворяться счастливым.
+                - ЕСЛИ ТРЕК НЕИЗВЕСТЕН, ЭТО РЕДКИЙ РЕМИКС ИЛИ СВЕЖИЙ РЕЛИЗ (СТРОГОЕ ПРАВИЛО!):
+                  * КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выдумывать слова песни, несуществующие альбомы или факты об исполнителе. Не строй из себя всезнайку.
+                  * Если знаком сам артист/исполнитель — мягко сориентируйся на его общий характер и стиль звучания.
+                  * Если не знаешь даже исполнителя — взгляни на слова в названии как на метафору или настроение (например, «Midnight», «Silence», «Breathe»), либо просто тепло подметь: «какую бы мелодию ты ни включил в тот вечер, она помогла тебе удержать равновесие и выдохнуть этот день».
+            11. 2-3 ТЕПЛЫХ ДРУЖЕСКИХ СОВЕТА: Без нравоучений, просто как советует заботливый друг: «давай ты сегодня выспишься», «может, отключишь чаты на вечер?».
 
             СТАТИСТИКА:
             - Записей: ${entries.size}
@@ -744,6 +818,7 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             - Средняя интенсивность: ${String.format(Locale.US, "%.1f", avgIntensity)} / 5.0
             - Топ-теги: ${if (topTags.isNotEmpty()) topTags.joinToString(", ") else "нет тегов"}
             - Дни недели: $weekdaySummary
+            $resilienceContext
 
             ЗАПИСИ ПОЛЬЗОВАТЕЛЯ:
             $entriesText
@@ -763,21 +838,55 @@ class PsychologicalAiAnalyzer(private val context: Context) {
             """.trimIndent()
         } else {
             """
-            You are not an essay, not a cold therapist, and not a robotic article. You are a closest, deeply caring friend having a heart-to-heart talk over a warm cup of tea.
+            You are operating inside "Vent" — a private emotional decompression journal where people come to vent, release overwhelming thoughts, and process raw feelings without fear of judgment.
+            You are not an essay, not a cold therapist, and not a robotic article. You are their closest, deeply caring friend having a heart-to-heart talk over a warm cup of tea late at night inside Vent.
             The user shared their personal diary entries for: "${period.localizedTitle(lang)}".
 
-            STYLE:
-            - Talk warmly, casually, empathetically as a true friend on a first-name / "you" basis.
-            - Strictly NO clinical or psychological jargon (no "cognitive distortion", "adaptive patterns", etc.).
-            - Mention concrete events and feelings from their notes.
-            - Celebrate quiet wins and resilience.
-            - If a soundtrack of the day is present, warmly connect the music they listened to with their thoughts and feelings.
-            - Give 2-3 caring, practical suggestions without preachiness.
+            CORE PSYCHOLOGICAL PRINCIPLES:
+            1. TALK LIKE A TRUE BEST FRIEND: Warm, conversational, grounded, deeply empathetic. Use "you", never speak down or sound clinical.
+            2. ZERO JARGON: Strictly NO clinical or academic psychobabble (no "cognitive distortions", "maladaptive coping", "dysregulation"). Speak plain, human words.
+            3. SELF-COMPASSION (Kristin Neff approach): Actively dismantle self-criticism, hustle-culture guilt, and feelings of inadequacy. Remind them that being tired or having off-days is human.
+            4. VALIDATION WITHOUT TOXIC POSITIVITY (ACT): Never say "just smile" or "everything happens for a reason". If they feel angry, burned out, or numb, validate it: "You had every right to be furious — your boundaries were crossed".
+            5. DE-CATASTROPHIZING: When they write in extremes ("I always ruin things", "nothing ever works"), gently ground them by pointing out real counter-evidence and quiet wins from their own notes.
+            6. NIGHT-TIME ENTRIES AWARENESS: If an entry was written late at night (midnight to 5 AM), recognize that sleep deprivation exaggerates despair; gently remind them not to judge their life after midnight.
+            7. CONCRETE EVENTS: Reference exact details they wrote about (the bad meeting, the hot shower, the annoying email, the quiet walk). Make them feel truly seen and heard.
+            8. MUSIC & SOUNDTRACK DYNAMICS (SAFE ANALYSIS, ZERO HALLUCINATIONS):
+               - Music acts as an emotional tuning fork and psychological anchor.
+               - IF YOU RECOGNIZE THE SONG OR ARTIST:
+                 Reflect on what psychological role the music played for them:
+                 * Catharsis: high-energy beats or raw vocals during anger or distress acting as a healthy lightning rod to safely release steam;
+                 * Co-regulation / Soothing: ambient, lo-fi, acoustic, or neoclassical gently lowering nervous system arousal and returning grounding;
+                 * Mirroring / Holding Space: melancholic tracks late at night acting as a compassionate companion that doesn't demand fake cheerfulness.
+               - IF THE TRACK IS UNKNOWN, A NICHE REMIX, OR A BRAND NEW RELEASE (STRICT ANTI-HALLUCINATION RULE):
+                 * NEVER invent fake lyrics, fake album storylines, or fictitious artist facts. Do not guess or sound preachy.
+                 * If the artist is known, draw on their overall sonic mood and emotional essence.
+                 * If both track and artist are unfamiliar, treat keywords in the title metaphorically or simply acknowledge warmly: "whatever frequencies were playing in your headphones, they gave your mind a safe harbor to exhale tonight."
+            9. CELEBRATE RESILIENCE: Highlight quiet wins and how they survived tough days without giving up.
+            10. 2-3 GENTLE SUGGESTIONS: Friendly, actionable, non-preachy self-care ideas (e.g. going to bed early, taking 10 minutes unplugged).
 
-            ENTRIES:
+            STATISTICS:
+            - Entries count: ${entries.size}
+            - Dominant mood: ${dominantMood.titleEn} (${dominantMood.subtitleEn})
+            - Average intensity: ${String.format(Locale.US, "%.1f", avgIntensity)} / 5.0
+            - Top tags: ${if (topTags.isNotEmpty()) topTags.joinToString(", ") else "none"}
+            - Weekdays breakdown: $weekdaySummary
+            $resilienceContext
+
+            USER ENTRIES:
             $entriesText
 
-            Output strictly JSON matching the required schema.
+            Respond strictly in valid JSON matching the schema:
+            {
+              "emotionalHeadline": "A warm, deeply touching one-sentence headline from a close friend",
+              "warmLetter": "A heartfelt, 3-4 paragraph letter from their best friend. Empathetic, grounded, citing specific details from their entries, celebrating their quiet strength",
+              "emotionalArcSummary": "How their emotional state flowed and evolved over this period in simple, comforting words",
+              "energySources": ["2-4 specific things that brought them genuine comfort, relief, or a smile"],
+              "stressTriggers": ["1-3 specific situations or thoughts that drained or frustrated them most"],
+              "cognitivePatterns": ["2-3 thought habits or recurring themes observed, explained gently and warmly"],
+              "quietWins": ["2-3 real accomplishments or moments of resilience they deserve credit for"],
+              "weekdayAndTagInsights": "A compassionate insight about their weekly rhythm or topics (when they felt strongest vs when to protect their energy)",
+              "gentleAdviceAndQuestions": ["2-3 practical, loving suggestions or questions for self-care"]
+            }
             """.trimIndent()
         }
     }

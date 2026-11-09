@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
@@ -41,21 +43,29 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.TrendingDown
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,9 +91,11 @@ import com.example.data.ai.WeekdayMoodSummary
 import com.example.data.model.BotanicalMood
 import com.example.ui.components.BotanicalMoodIllustration
 import com.example.ui.theme.NunitoFontFamily
+import com.example.util.DateAndPhotoUtils
 import com.example.util.GoogleAuthValidator
 import com.example.util.LocalAppLanguage
 import com.example.util.tr
+import java.util.Calendar
 
 /**
  * Inviting banner shown on the Home Journal screen at the end of the month,
@@ -258,10 +270,11 @@ fun AiPsychologicalHubSection(
     val currentSavedReport = activePeriod?.let { period ->
         savedReports[period.periodKey]
             ?: (aiUiState as? AiAnalysisUiState.Success)?.report?.takeIf { it.periodKey == period.periodKey }
-    }
+    } ?: savedReports[selectedPeriodKey]
 
     val isGoogleUser = remember { GoogleAuthValidator.isGenuineGoogleUser() }
     var lastAutoRequestedKey by remember { mutableStateOf<String?>(null) }
+    var showArchiveSheet by remember { mutableStateOf(false) }
 
     // Auto-generate report once when opening a period that doesn't have a saved report yet (only for genuine Google users)
     LaunchedEffect(activePeriod?.periodKey, activePeriod?.entriesCount, isGoogleUser) {
@@ -307,6 +320,7 @@ fun AiPsychologicalHubSection(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -343,6 +357,41 @@ fun AiPsychologicalHubSection(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+
+                    if (savedReports.isNotEmpty()) {
+                        IconButton(
+                            onClick = { showArchiveSheet = true },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    CircleShape
+                                )
+                                .testTag("btn_ai_reports_archive")
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ) {
+                                        Text(
+                                            text = savedReports.size.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MenuBook,
+                                    contentDescription = tr("Saved AI Reports Archive", "Архив разборов ИИ"),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -718,6 +767,237 @@ fun AiPsychologicalHubSection(
         // 3. Detailed Psychological Report Cards (when available for the selected period)
         if (currentSavedReport != null) {
             PsychologicalReportContent(report = currentSavedReport)
+        }
+
+        // 4. Archive Sheet to Re-read Past AI Reports
+        if (showArchiveSheet) {
+            AiReportsArchiveBottomSheet(
+                savedReports = savedReports.values.toList(),
+                activePeriodKey = activePeriod?.periodKey ?: selectedPeriodKey,
+                onDismiss = { showArchiveSheet = false },
+                onSelectReport = { report ->
+                    showArchiveSheet = false
+                    val matchingPeriod = availablePeriods.firstOrNull { it.periodKey == report.periodKey }
+                    val category = matchingPeriod?.periodType ?: try {
+                        AnalysisPeriodType.valueOf(report.periodType)
+                    } catch (e: Exception) {
+                        AnalysisPeriodType.MONTHLY
+                    }
+                    onSelectCategory(category)
+                    onSelectPeriodKey(report.periodKey)
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Bottom Sheet Archive allowing users to re-read any previously generated AI reflections,
+ * view the exact dates, headlines, dominant emotions and entries analyzed without re-generating.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AiReportsArchiveBottomSheet(
+    savedReports: List<AiPsychologicalReport>,
+    activePeriodKey: String,
+    onDismiss: () -> Unit,
+    onSelectReport: (AiPsychologicalReport) -> Unit
+) {
+    val lang = LocalAppLanguage.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sortedReports = remember(savedReports) {
+        savedReports.sortedByDescending { it.createdAtMillis }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        },
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = tr("Reflections Archive", "Архив разборов ИИ"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = tr(
+                            "Re-read past letters, conclusions and dates without re-generating",
+                            "Перечитайте тёплые письма и выводы за любой период без повторной генерации"
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = tr("Close", "Закрыть"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+
+            if (sortedReports.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tr(
+                            "No generated reflections yet. Choose any period to create your first analysis.",
+                            "Пока нет сохранённых разборов. Выберите день, неделю или месяц для первого разбора."
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(sortedReports, key = { it.periodKey }) { report ->
+                        val isCurrent = report.periodKey == activePeriodKey
+                        val dominantMood = remember(report.dominantMoodKey) { report.dominantMood() }
+                        val createdDateLabel = remember(report.createdAtMillis, lang) {
+                            val cal = Calendar.getInstance().apply { timeInMillis = report.createdAtMillis }
+                            val iso = DateAndPhotoUtils.calendarToIso(cal)
+                            DateAndPhotoUtils.formatFullDate(iso, lang)
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectReport(report) }
+                                .testTag("archive_report_${report.periodKey}"),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isCurrent) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                }
+                            ),
+                            border = BorderStroke(
+                                width = if (isCurrent) 1.5.dp else 1.dp,
+                                color = if (isCurrent) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                }
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    BotanicalMoodIllustration(
+                                        mood = dominantMood,
+                                        size = 36.dp
+                                    )
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = report.periodTitle,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontFamily = NunitoFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = tr("Created on $createdDateLabel", "Сформирован: $createdDateLabel"),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                    ) {
+                                        Text(
+                                            text = tr("${report.entriesCount} entries", "${report.entriesCount} зап."),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                if (report.emotionalHeadline.isNotBlank()) {
+                                    Text(
+                                        text = "«${report.emotionalHeadline}»",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontFamily = NunitoFontFamily,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                                        maxLines = 2
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = dominantMood.fullTitle(lang),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+
+                                    Text(
+                                        text = tr("Re-read letter →", "Перечитать письмо →"),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

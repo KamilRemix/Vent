@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vent — Private Emotional Decompression Journal</title>
+  <meta name="description" content="Vent is a private emotional sanctuary featuring botanical mood metaphors, daily soundtrack psychology, and an empathetic AI companion powered by Gemini Flash.">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Dedicated Showcase / Landing Styling */
+    .hero-app-preview-box {
+      margin: 40px auto 0;
+      max-width: 720px;
+      background: var(--surface-card);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl);
+      padding: 16px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      position: relative;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .preview-browser-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .browser-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .preview-url-pill {
+      font-size: 11.5px;
+      font-family: var(--font-mono);
+      color: var(--text-tertiary);
+      background: var(--surface-input);
+      padding: 4px 14px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .preview-frame-content {
+      padding: 28px 24px 20px;
+      text-align: center;
+    }
+
+    .preview-headline {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+    }
+
+    .preview-sub {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      max-width: 520px;
+      margin: 0 auto 24px;
+      line-height: 1.6;
+    }
+
+    .preview-botanical-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .preview-botanical-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      background: var(--surface-input);
+      border: 1px solid var(--border-subtle);
+      transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+      cursor: pointer;
+    }
+
+    .preview-botanical-item:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-strong);
+    }
+
+    .preview-botanical-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .feature-showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 50px 0;
+    }
+
+    .showcase-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+    }
+
+    .showcase-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-strong);
+    }
+
+    .showcase-icon-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .showcase-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      background: var(--surface-input);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-primary);
+      flex-shrink: 0;
+    }
+
+    .showcase-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .showcase-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .sync-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent-primary);
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4ADE80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+      animation: pulseSync 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseSync {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================
+       LANDING HEADER
+       ======================================================================== -->
+  <header>
+    <div class="container header-inner">
+      <a href="index.html" class="brand-wrapper">
+        <div class="brand-icon-box">
+          <img src="icon.png" alt="Vent">
+        </div>
+        <span class="brand-name">Vent</span>
+        <span class="brand-badge">v1.0.8</span>
+      </a>
+
+      <!-- Quick Links -->
+      <nav class="nav-tab-container" style="background: transparent; border: none;">
+        <a href="#features" class="nav-tab-btn" style="text-decoration: none;" data-t="nav_phil">Philosophy</a>
+        <a href="#download" class="nav-tab-btn" style="text-decoration: none;" data-t="nav_apk">Android APK</a>
+      </nav>
+
+      <!-- Action controls -->
+      <div class="header-actions">
+        <button class="icon-btn" id="themeToggleBtn" title="Toggle Theme" aria-label="Toggle Theme">
+          <!-- Injected via JS -->
+        </button>
+        <button class="icon-btn" id="langToggleBtn" style="font-size: 11px; font-weight: 700; width: 44px;" title="Switch Language">
+          EN
+        </button>
+        <!-- Prominent Launch App Button (NO EMOJIS, Clean Vector Icon) -->
+        <a href="app.html" class="btn-primary" style="padding: 8px 18px; font-size: 13px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-t="btn_open_app">Open Web Version</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       HERO SECTION
+       ======================================================================== -->
+  <section class="hero-banner" style="padding: 60px 0 40px;">
+    <div class="container">
+      <div class="hero-tag">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span data-t="hero_tag">Private Decompression Sanctuary</span>
+      </div>
+
+      <h1 class="hero-title">
+        <span data-t="hero_title_prefix">Where raw thoughts find</span><br>
+        <em data-t="hero_title_highlight">quiet understanding</em>
+      </h1>
+
+      <p class="hero-subtitle" data-t="hero_sub">
+        An intimate, judgment-free journal. Botanical emotional states, daily soundtrack analysis, and compassionate reflections grounded in clinical psychology.
+      </p>
+
+      <!-- TWO PRIMARY BUTTONS: Web App & APK Download (NO EMOJIS) -->
+      <div class="hero-cta-row">
+        <a href="app.html" class="btn-primary" style="padding: 14px 28px; font-size: 16px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-t="btn_open_app">Open Web Version</span>
+        </a>
+        <a href="https://github.com/KamilRemix/Vent/raw/main/Vent.apk" download="Vent.apk" class="btn-secondary" style="padding: 14px 26px; font-size: 15px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-t="btn_download_apk">Download Vent for Android</span>
+        </a>
+      </div>
+
+      <!-- Interactive Web App Showcase Card -->
+      <div class="hero-app-preview-box">
+        <div class="preview-browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot" style="background: #FF5C5C;"></div>
+            <div class="browser-dot" style="background: #FFBD2E;"></div>
+            <div class="browser-dot" style="background: #27C93F;"></div>
+          </div>
+          <div class="preview-url-pill">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span data-t="preview_url_label">vent.app/web • Chromebook, iPhone & Android</span>
+          </div>
+          <div class="sync-status-pill">
+            <div class="pulse-dot"></div>
+            <span data-t="preview_sync_label">Cloud Sync Active</span>
+          </div>
+        </div>
+
+        <div class="preview-frame-content">
+          <div style="margin-bottom: 12px; height: 64px; display: flex; align-items: center; justify-content: center;" id="heroPreviewIcon"></div>
+          <p id="heroPreviewQuote" style="font-family: var(--font-serif); font-style: italic; font-size: 17px; color: var(--accent-primary); margin-bottom: 12px; min-height: 24px;"></p>
+          <h3 class="preview-headline" data-t="preview_headline">One Journal. Everywhere You Need It.</h3>
+          <p class="preview-sub" data-t="preview_sub">
+            Write on your phone at home, open your Chromebook in school, or check from an iPhone. Sign in with Google to synchronize your thoughts seamlessly.
+          </p>
+
+          <!-- Interactive Botanical Preview Chips -->
+          <div class="preview-botanical-strip" id="heroBotanicalStrip">
+            <!-- Injected via script with BotanicalSVGs -->
+          </div>
+
+          <a href="app.html" class="btn-primary" style="padding: 12px 28px; font-size: 14px;">
+            <span data-t="btn_preview_open">Open Vent Web Sanctuary</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       PHILOSOPHY & FEATURES (ALL EMOJIS REPLACED WITH CLEAN VECTOR SVGs)
+       ======================================================================== -->
+  <section class="container" id="features" style="padding: 40px 0 60px;">
+    <div style="text-align: center; max-width: 620px; margin: 0 auto 36px;">
+      <h2 style="font-family: var(--font-serif); font-size: 34px; font-weight: 700;" data-t="phil_title">Designed Around Clinical Psychology</h2>
+      <p style="font-size: 15px; color: var(--text-secondary); margin-top: 8px;" data-t="phil_sub">
+        Unlike sterile habit apps or toxic productivity tools, Vent is engineered to protect your mental energy and give raw feelings a safe harbor.
+      </p>
+    </div>
+
+    <div class="feature-showcase-grid">
+      <!-- 1. Botanical Metaphors -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" id="showcaseBloomSlot"></div>
+          <h3 class="showcase-title" data-t="card1_title">Botanical Moods</h3>
+        </div>
+        <p class="showcase-desc" data-t="card1_desc">
+          No generic emojis. Emotional states shift like weather: Wildfire anger, Melancholy rain, Calm leaves, and Ash mist. Or simply vent freely without choosing any label.
+        </p>
+      </div>
+
+      <!-- 2. Soundtrack Psychology -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" style="color: var(--accent-terracotta);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+          </div>
+          <h3 class="showcase-title" data-t="card2_title">Soundtrack Psychology</h3>
+        </div>
+        <p class="showcase-desc" data-t="card2_desc">
+          Music acts as an emotional lightning rod. Gemini understands whether heavy beats serve as a cathartic adrenaline release or ambient lo-fi acts as a nervous system blanket.
+        </p>
+      </div>
+
+      <!-- 3. Circadian Awareness -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" style="color: var(--accent-amber);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </div>
+          <h3 class="showcase-title" data-t="card3_title">Circadian Rhythm</h3>
+        </div>
+        <p class="showcase-desc" data-t="card3_desc">
+          Writing at 3:00 AM? The AI recognizes nighttime prefrontal exhaustion and gently reminds you not to judge your whole life after midnight.
+        </p>
+      </div>
+
+      <!-- 4. Time Capsules -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" style="color: var(--accent-primary);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3 class="showcase-title" data-t="card4_title">Time Capsules</h3>
+        </div>
+        <p class="showcase-desc" data-t="card4_desc">
+          Write letters to your future self that stay sealed until a chosen date. Revisit your growth with genuine perspective.
+        </p>
+      </div>
+
+      <!-- 5. Cross-Device Cloud Sync -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" style="color: #60A5FA;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          </div>
+          <h3 class="showcase-title" data-t="card5_title">Seamless Google Sync</h3>
+        </div>
+        <p class="showcase-desc" data-t="card5_desc">
+          Connect your Google Account to synchronize across Android phone, school Chromebook, and desktop browser without losing a single line.
+        </p>
+      </div>
+
+      <!-- 6. Zero Trackers & Privacy -->
+      <div class="showcase-card">
+        <div class="showcase-icon-row">
+          <div class="showcase-icon-box" style="color: #34D399;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="showcase-title" data-t="card6_title">100% Private</h3>
+        </div>
+        <p class="showcase-desc" data-t="card6_desc">
+          Zero advertising, zero tracker SDKs, and offline-first encryption. Your vulnerable feelings belong only to you.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       DOWNLOAD APK BANNER
+       ======================================================================== -->
+  <section class="download-footer-banner" id="download">
+    <div class="container">
+      <div class="download-banner-box">
+        <div class="download-banner-left">
+          <h2 class="download-banner-title" data-t="down_banner_title">Take Vent Everywhere</h2>
+          <p class="download-banner-desc" data-t="down_banner_desc">
+            Download the official Android APK (v1.0.8, 26.6 MB). Private, offline-first, signed build.
+          </p>
+          <div class="download-banner-tags">
+            <span class="spec-badge">Android 8.0+</span>
+            <span class="spec-badge">100% Offline-First</span>
+            <span class="spec-badge">Zero Trackers</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <a href="https://github.com/KamilRemix/Vent/raw/main/Vent.apk" download="Vent.apk" class="btn-primary" style="padding: 16px 32px; font-size: 15px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-t="btn_download_apk">Download Vent.apk</span>
+          </a>
+          <a href="app.html" class="btn-secondary" style="padding: 16px 24px; font-size: 15px;">
+            <span data-t="btn_open_app">Open Web Version</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       FOOTER
+       ======================================================================== -->
+  <footer>
+    <div class="container">
+      <div class="footer-nav">
+        <a href="app.html">Launch Web App</a>
+        <a href="#features">Philosophy</a>
+        <a href="https://github.com/KamilRemix/Vent/raw/main/Vent.apk" download="Vent.apk">Vent.apk</a>
+      </div>
+      <p>&copy; 2026 Vent Project. Grounded in clinical empathy and botanical mindfulness.</p>
+    </div>
+  </footer>
+
+  <script src="landing.js"></script>
+</body>
+</html>

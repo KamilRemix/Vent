@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Vent — Mindful Personal Diary & Time Capsule</title>
+  <meta name="description" content="Vent web application. 1-to-1 parity with Android Jetpack Compose app: Journal, Calendar, Capsule, Search & Insights.">
+  <link rel="icon" type="image/png" href="icon.png">
+  
+  <!-- Styling -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="app.css">
+
+  <!-- Firebase SDKs for Cloud Sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+  <!-- Full App Shell with NavigationRail (Desktop) & NavigationBar (Mobile) -->
+  <div class="app-layout-shell" id="appLayoutShell">
+
+    <!-- ====================================================================
+         TOP APP BAR (1-to-1 with Kotlin TopAppBar)
+         ==================================================================== -->
+    <header class="app-top-bar">
+      <div class="top-bar-left">
+        <a href="index.html" class="brand-link" title="Website">
+          <div class="brand-icon-mini">
+            <img src="icon.png" alt="Vent Logo">
+          </div>
+          <span class="brand-title">Vent</span>
+        </a>
+
+        <!-- Current Tab Badge (1-to-1 with Kotlin TopAppBar title badge) -->
+        <div class="current-tab-badge" id="currentTabBadge">
+          <span id="currentTabBadgeText">Дневник</span>
+        </div>
+
+        <!-- Cloud Sync Pulse Pill -->
+        <div class="sync-status-badge" id="syncStatusBadge">
+          <div class="sync-pulse-dot" id="syncDot"></div>
+          <span id="syncStatusText">Локально (Гость)</span>
+        </div>
+      </div>
+
+      <!-- Right Action Tools: Settings Gear & Auth Pill -->
+      <div class="top-bar-right">
+        <div id="authContainer">
+          <button class="btn-google-login" onclick="signInWithGoogle()">
+            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.8s.2-2.1.4-2.8L1.9 6.3C.7 8.7 0 10.8 0 12s.7 3.3 1.9 5.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.4C3.7 20.4 7.5 23 12 23z"/></svg>
+            <span data-t="sign_in_google">Войти</span>
+          </button>
+        </div>
+
+        <button class="icon-control-btn" id="btnOpenSettings" onclick="openSettingsModal()" title="Настройки" aria-label="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+
+        <a href="index.html" class="website-pill-link" title="Website">
+          <span data-t="btn_back_site">Сайт</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Workspace: Side NavigationRail (Desktop) + Content Container -->
+    <div class="app-workspace-body">
+
+      <!-- ====================================================================
+           NAVIGATION RAIL (Desktop/Chromebook: Width >= 600dp, exactly as in Kotlin)
+           ==================================================================== -->
+      <aside class="desktop-navigation-rail">
+        <div class="nav-rail-inner">
+          <button class="nav-rail-item active" data-destination="JOURNAL" onclick="navigateTo('JOURNAL')">
+            <div class="nav-rail-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <span class="nav-rail-label" data-t="nav_journal">Дневник</span>
+          </button>
+
+          <button class="nav-rail-item" data-destination="CALENDAR" onclick="navigateTo('CALENDAR')">
+            <div class="nav-rail-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <span class="nav-rail-label" data-t="nav_calendar">Календарь</span>
+          </button>
+
+          <button class="nav-rail-item" data-destination="LETTERS" onclick="navigateTo('LETTERS')">
+            <div class="nav-rail-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
+            </div>
+            <span class="nav-rail-label" data-t="nav_letters">Капсула</span>
+          </button>
+
+          <button class="nav-rail-item" data-destination="SEARCH" onclick="navigateTo('SEARCH')">
+            <div class="nav-rail-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <span class="nav-rail-label" data-t="nav_search">Поиск</span>
+          </button>
+
+          <button class="nav-rail-item" data-destination="INSIGHTS" onclick="navigateTo('INSIGHTS')">
+            <div class="nav-rail-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+            </div>
+            <span class="nav-rail-label" data-t="nav_analytics">Аналитика</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ====================================================================
+           MAIN CONTENT AREA (5 SCREENS)
+           ==================================================================== -->
+      <main class="app-main-viewport">
+
+        <!-- ==================================================================
+             DESTINATION 1: JOURNAL (1-to-1 JournalHomeTab)
+             ================================================================== -->
+        <section class="screen-view active" id="view-journal">
+          <div class="journal-tab-layout">
+
+            <!-- 1. Clean Hero Summary Banner with Day Navigation & Swipe -->
+            <div class="journal-hero-banner-card">
+              <div class="hero-banner-inner">
+                <div class="hero-banner-text-col">
+                  <div class="hero-tag-pill">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span data-t="mindful_journal_tag">Дневник эмоций</span>
+                  </div>
+
+                  <!-- Day Navigation Row: < Date > -->
+                  <div class="day-navigation-row">
+                    <button class="day-nav-arrow-btn" id="btnPrevDay" onclick="shiftSelectedDay(-1)" title="Предыдущий день">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <h2 class="day-nav-date-display" id="dayNavDateDisplay">Воскресенье, 8 ноября 2026 г.</h2>
+                    <button class="day-nav-arrow-btn" id="btnNextDay" onclick="shiftSelectedDay(1)" title="Следующий день">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+
+                  <p class="hero-mood-status-text" id="heroMoodStatusText">Тихое пространство для ваших мыслей</p>
+
+                  <!-- All Dates Button (Links to CalendarTab) -->
+                  <div>
+                    <button class="outlined-chip-btn" onclick="navigateTo('CALENDAR')">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <span data-t="all_dates_btn">Все даты</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="hero-botanical-art-box" id="heroBotanicalSlot">
+                  <!-- Injected via app.js -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. "On This Day" Memory Flashback Card (if available from previous years) -->
+            <div id="onThisDayContainer"></div>
+
+            <!-- 3. Selected Date Section Header + Actions -->
+            <div class="selected-date-section-header">
+              <div>
+                <h3 class="section-title-text" id="selectedDateSectionTitle">Записи за 8 нояб.</h3>
+                <p class="section-subtitle-text" id="selectedDateSectionSub">За этот день пока нет записей</p>
+              </div>
+
+              <div class="date-header-action-btns">
+                <button class="outlined-chip-btn" id="btnAnalyzeDayAi" onclick="openDayAiAnalysis()" style="display: none;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 1 5 5v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-1H3a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V7a5 5 0 0 1 5-5h3z"/></svg>
+                  <span data-t="btn_ai_day">ИИ-день</span>
+                </button>
+
+                <button class="btn-primary" onclick="openEditorModal(state.selectedDateIso)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span data-t="btn_new_entry">Запись</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Selected Date Cards or Empty Prompt -->
+            <div class="selected-date-entries-list" id="selectedDateEntriesList">
+              <!-- Injected via app.js -->
+            </div>
+
+            <!-- 4. Recent Timeline Feed (Entries from other dates) -->
+            <div class="recent-timeline-section" id="recentTimelineSection">
+              <h3 class="section-title-text" id="recentTimelineTitle">Недавние записи</h3>
+              <div class="recent-timeline-grid" id="recentTimelineGrid">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             DESTINATION 2: CALENDAR (1-to-1 CalendarTab)
+             ================================================================== -->
+        <section class="screen-view" id="view-calendar">
+          <div class="calendar-tab-layout">
+
+            <!-- Month Calendar Header Card -->
+            <div class="calendar-card-container">
+              <div class="calendar-month-switcher-row">
+                <button class="icon-control-btn" onclick="navigateCalendarMonth(-1)" title="Предыдущий месяц">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+
+                <div class="calendar-header-title-box">
+                  <h2 class="calendar-month-year-title" id="calendarMonthYearTitle">Ноябрь 2026</h2>
+                  <span class="calendar-sub-label" data-t="calendar_mood_title">Календарь настроений</span>
+                </div>
+
+                <button class="icon-control-btn" onclick="navigateCalendarMonth(1)" title="Следующий месяц">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+
+              <!-- Weekdays Row: Пн Вт Ср Чт Пт Сб Вс -->
+              <div class="calendar-weekdays-row" id="calendarWeekdaysRow">
+                <!-- Injected via app.js -->
+              </div>
+
+              <!-- Month Grid (42 cells: 6 rows of 7 days) -->
+              <div class="calendar-month-grid" id="calendarMonthGrid">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+            <!-- Selected Day Section below Calendar -->
+            <div class="calendar-selected-day-details">
+              <div class="selected-date-section-header">
+                <div>
+                  <h3 class="section-title-text" id="calendarSelectedDayTitle">Записи за 8 нояб.</h3>
+                  <p class="section-subtitle-text" id="calendarSelectedDaySub">За этот день пока нет записей</p>
+                </div>
+                <button class="btn-primary" onclick="openEditorModal(state.selectedDateIso)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span data-t="btn_new_entry">Запись</span>
+                </button>
+              </div>
+
+              <div class="selected-date-entries-list" id="calendarSelectedDayEntriesList">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             DESTINATION 3: CAPSULE (1-to-1 FutureLettersTab)
+             ================================================================== -->
+        <section class="screen-view" id="view-letters">
+          <div class="letters-tab-layout">
+
+            <div class="screen-header-row">
+              <div>
+                <h2 class="screen-title" data-t="capsules_title">Капсулы времени</h2>
+                <p class="screen-subtitle">Письма себе в будущее, защищенные до даты вскрытия</p>
+              </div>
+              <button class="btn-primary" onclick="openFutureLetterComposer()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span data-t="btn_compose_letter">Написать письмо</span>
+              </button>
+            </div>
+
+            <!-- Sealed Letters Section -->
+            <div class="capsules-section-group">
+              <h3 class="section-title-text" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-amber);"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span data-t="sealed_letters_title">Запечатанные письма</span>
+              </h3>
+              <div class="capsules-grid" id="sealedLettersGrid">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+            <!-- Unlocked Letters Section -->
+            <div class="capsules-section-group" style="margin-top: 36px;">
+              <h3 class="section-title-text" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span data-t="unlocked_letters_title">Открытые письма</span>
+              </h3>
+              <div class="capsules-grid" id="unlockedLettersGrid">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             DESTINATION 4: SEARCH (1-to-1 SearchAndTagsTab)
+             ================================================================== -->
+        <section class="screen-view" id="view-search">
+          <div class="search-tab-layout">
+
+            <!-- Search Input Bar -->
+            <div class="search-input-wrapper">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="searchInputField" placeholder="Поиск по заголовку, тексту, мыслям или тегу..." oninput="handleSearchInputChange(this.value)">
+              <button class="clear-search-btn" id="btnClearSearch" onclick="clearSearchQuery()" style="display: none;" title="Очистить поиск">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <!-- Filter Section Header + Reset Button -->
+            <div class="search-filters-card">
+              <div class="filters-header-row">
+                <span class="filters-header-title" data-t="filter_mood_tags_title">Фильтр по настроению и тегам</span>
+                <button class="text-reset-btn" id="btnResetFilters" onclick="resetSearchFilters()" style="display: none;" data-t="reset_all_btn">Сбросить</button>
+              </div>
+
+              <!-- Mood Filter Chips (9 states) -->
+              <div class="filters-flow-row" id="searchMoodFiltersRow">
+                <!-- Injected via app.js -->
+              </div>
+
+              <!-- Tags Filter Chips -->
+              <div class="filters-flow-row" id="searchTagFiltersRow" style="margin-top: 10px;">
+                <!-- Injected via app.js -->
+              </div>
+            </div>
+
+            <!-- Results Count -->
+            <div class="search-results-count-row">
+              <span id="searchResultsCountText">Найдено записей: 0</span>
+            </div>
+
+            <!-- Search Results Feed -->
+            <div class="journal-feed-grid" id="searchResultsGrid">
+              <!-- Injected via app.js -->
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             DESTINATION 5: INSIGHTS (1-to-1 AnalyticsTab & Psychological Hub)
+             ================================================================== -->
+        <section class="screen-view" id="view-insights">
+          <div class="insights-tab-layout">
+
+            <!-- 1. Key Metrics Stat Cards (Записи, Дней, Фото) -->
+            <div class="metrics-stat-grid">
+              <div class="metric-stat-card">
+                <div class="metric-stat-title" data-t="metric_entries_title">Записи</div>
+                <div class="metric-stat-num" id="metricTotalEntries">0</div>
+                <div class="metric-stat-sub" data-t="metric_entries_sub">Всего в дневнике</div>
+              </div>
+
+              <div class="metric-stat-card">
+                <div class="metric-stat-title" data-t="metric_days_title">Дней</div>
+                <div class="metric-stat-num" id="metricActiveDays">0</div>
+                <div class="metric-stat-sub" data-t="metric_days_sub">С записями</div>
+              </div>
+
+              <div class="metric-stat-card">
+                <div class="metric-stat-title" data-t="metric_photos_title">Фото</div>
+                <div class="metric-stat-num" id="metricTotalPhotos">0</div>
+                <div class="metric-stat-sub" data-t="metric_photos_sub">В облаке</div>
+              </div>
+            </div>
+
+            <!-- 2. AI Psychological Analysis Hub -->
+            <div class="ai-letter-hero-card" style="margin-top: 24px;">
+              <div class="ai-hub-header-row">
+                <div class="ai-friend-badge">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span data-t="ai_badge">Психологический хаб Gemini Flash</span>
+                </div>
+
+                <!-- Category Filters: Дни, Недели, Месяцы, Итоги года -->
+                <div class="period-tabs-bar" style="margin-bottom: 0;">
+                  <button class="period-tab-btn active" data-cat="DAYS" onclick="setAiCategory('DAYS')">Дни</button>
+                  <button class="period-tab-btn" data-cat="WEEKS" onclick="setAiCategory('WEEKS')">30 дней</button>
+                  <button class="period-tab-btn" data-cat="MONTHS" onclick="setAiCategory('MONTHS')">Месяцы</button>
+                  <button class="period-tab-btn" data-cat="YEARS" onclick="setAiCategory('YEARS')">Итоги года</button>
+                </div>
+              </div>
+
+              <h3 class="ai-headline-text" id="aiHeadlineDisplay">
+                <!-- Injected via app.js -->
+              </h3>
+
+              <div class="ai-warm-letter-body" id="aiWarmLetterDisplay">
+                <!-- Injected via app.js -->
+              </div>
+
+              <!-- Soundtrack Psychology Analysis -->
+              <div class="ai-music-analysis-box">
+                <div class="music-analysis-icon-box">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                </div>
+                <div>
+                  <div class="music-analysis-content-title" data-t="ai_music_title">Психологическая роль саундтрека:</div>
+                  <div class="music-analysis-content-desc" id="aiMusicAnalysisDisplay">
+                    <!-- Injected via app.js -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Most Frequent Mood Highlight Card -->
+            <div id="dominantMoodHighlightSlot" style="margin-top: 24px;"></div>
+
+            <!-- 4. Emotional Balance Distribution Bar -->
+            <div class="bento-card" style="margin-top: 24px; padding: 26px;">
+              <div class="bento-title-row">
+                <div class="bento-icon-box" style="color: var(--accent-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                </div>
+                <span data-t="emotional_balance_title">Эмоциональный баланс</span>
+              </div>
+              <p class="section-subtitle-text" style="margin-bottom: 16px;">Распределение состояний по всем вашим записям</p>
+
+              <!-- Distribution Bar -->
+              <div class="mood-distribution-bar-track" id="moodDistributionBarTrack"></div>
+
+              <!-- Mood Breakdown List -->
+              <div class="mood-breakdown-list" id="moodBreakdownList"></div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+    <!-- ====================================================================
+         BOTTOM NAVIGATION BAR (Mobile Screens < 600dp: 1-to-1 with NavigationBar)
+         ==================================================================== -->
+    <nav class="app-bottom-nav">
+      <button class="bottom-nav-item active" data-destination="JOURNAL" onclick="navigateTo('JOURNAL')">
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="bottom-nav-label" data-t="nav_journal">Дневник</span>
+      </button>
+
+      <button class="bottom-nav-item" data-destination="CALENDAR" onclick="navigateTo('CALENDAR')">
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="bottom-nav-label" data-t="nav_calendar">Календарь</span>
+      </button>
+
+      <button class="bottom-nav-item" data-destination="LETTERS" onclick="navigateTo('LETTERS')">
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
+        <span class="bottom-nav-label" data-t="nav_letters">Капсула</span>
+      </button>
+
+      <button class="bottom-nav-item" data-destination="SEARCH" onclick="navigateTo('SEARCH')">
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span class="bottom-nav-label" data-t="nav_search">Поиск</span>
+      </button>
+
+      <button class="bottom-nav-item" data-destination="INSIGHTS" onclick="navigateTo('INSIGHTS')">
+        <svg class="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        <span class="bottom-nav-label" data-t="nav_analytics">Аналитика</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ======================================================================
+       MODAL 1: DIARY ENTRY EDITOR (1-to-1 DiaryEntryEditorScreen)
+       ====================================================================== -->
+  <div class="modal-overlay" id="editorModalOverlay" style="display: none;">
+    <div class="modal-container-card">
+      <div class="modal-header-row">
+        <div>
+          <h2 class="modal-title" id="editorModalTitle">Новая запись</h2>
+          <span class="modal-subtitle" id="editorModalDateSub">8 ноября 2026 г.</span>
+        </div>
+        <button class="icon-control-btn" onclick="closeEditorModal()" title="Закрыть">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-scrollable-content">
+        <!-- Botanical Mood Selector Grid -->
+        <div class="editor-section-label">Выберите ботаническое состояние:</div>
+        <div class="mood-selector-grid" id="editorMoodSelectorGrid"></div>
+
+        <!-- Title Input -->
+        <div class="control-field" style="margin-bottom: 12px;">
+          <input type="text" id="editorTitleInput" placeholder="Заголовок (необязательно)">
+        </div>
+
+        <!-- Content Textarea -->
+        <div class="stream-textarea-wrapper">
+          <textarea id="editorContentInput" class="stream-textarea" placeholder="О чем вы думаете сегодня? Запишите свои мысли без цензуры..."></textarea>
+        </div>
+
+        <!-- Question of the Day from ReflectionPrompts.kt -->
+        <div class="reflection-prompt-box">
+          <div class="prompt-icon-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/><circle cx="12" cy="12" r="5"/></svg>
+          </div>
+          <div style="flex: 1;">
+            <strong id="editorReflectionPromptLabel">Вопрос дня:</strong>
+            <p id="editorReflectionPromptText" style="font-size: 13.5px; margin: 4px 0 8px;"></p>
+            <input type="text" id="editorReflectionAnswerInput" class="control-field-inner" placeholder="Ваш ответ на вопрос дня...">
+          </div>
+        </div>
+
+        <!-- Soundtrack & Tags -->
+        <div class="editor-controls-grid">
+          <div class="control-field">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-terracotta); flex-shrink: 0;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+            <input type="text" id="editorMusicInput" placeholder="Саундтрек в наушниках (Radiohead, Lo-Fi...)">
+          </div>
+
+          <div class="control-field">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-tertiary); flex-shrink: 0;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            <input type="text" id="editorTagsInput" placeholder="Теги через запятую (работа, вечер...)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="modal-footer-row">
+        <button class="btn-secondary" onclick="closeEditorModal()">Отмена</button>
+        <button class="btn-primary" id="btnSaveEditorEntry" onclick="submitSaveEntry()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Сохранить запись</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 2: DIARY ENTRY READER (1-to-1 DiaryEntryReaderScreen)
+       ====================================================================== -->
+  <div class="modal-overlay" id="readerModalOverlay" style="display: none;">
+    <div class="modal-container-card">
+      <div class="modal-header-row">
+        <button class="outlined-chip-btn" onclick="closeReaderModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Назад</span>
+        </button>
+
+        <div class="reader-top-action-btns">
+          <button class="outlined-chip-btn" id="btnReaderEditEntry" onclick="editCurrentViewingEntry()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Редактировать</span>
+          </button>
+          <button class="card-delete-btn" onclick="deleteCurrentViewingEntry()" style="padding: 6px 12px; font-size: 13px;">
+            Удалить
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-scrollable-content" id="readerModalContent">
+        <!-- Injected via app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 3: FUTURE LETTER COMPOSER (1-to-1 FutureLetterComposerScreen)
+       ====================================================================== -->
+  <div class="modal-overlay" id="letterComposerModalOverlay" style="display: none;">
+    <div class="modal-container-card">
+      <div class="modal-header-row">
+        <div>
+          <h2 class="modal-title">Письмо в будущее</h2>
+          <span class="modal-subtitle">Будет запечатано до назначенной даты</span>
+        </div>
+        <button class="icon-control-btn" onclick="closeFutureLetterComposer()" title="Закрыть">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-scrollable-content">
+        <!-- Unlock Date & Time Pickers -->
+        <div class="editor-controls-grid" style="margin-bottom: 16px;">
+          <div class="control-field">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-amber);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <input type="date" id="letterUnlockDateInput" class="capsule-date-picker" style="width: 100%;">
+          </div>
+
+          <div class="control-field">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-amber);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <input type="time" id="letterUnlockTimeInput" class="capsule-date-picker" value="09:00" style="width: 100%;">
+          </div>
+        </div>
+
+        <div class="editor-section-label">Выберите состояние для письма:</div>
+        <div class="mood-selector-grid" id="letterMoodSelectorGrid"></div>
+
+        <div class="control-field" style="margin-bottom: 12px;">
+          <input type="text" id="letterTitleInput" placeholder="Заголовок письма будущему себе">
+        </div>
+
+        <div class="stream-textarea-wrapper">
+          <textarea id="letterContentInput" class="stream-textarea" placeholder="Напишите себе письмо... Чего вы ждете от себя через год? О чем хотите напомнить?"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer-row">
+        <button class="btn-secondary" onclick="closeFutureLetterComposer()">Отмена</button>
+        <button class="btn-primary" onclick="submitSaveFutureLetter()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Запечатать письмо</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 4: SEALED LETTER DIALOG (1-to-1 Sealed Letter Dialog from Kotlin)
+       ====================================================================== -->
+  <div class="modal-overlay" id="sealedLetterModalOverlay" style="display: none;">
+    <div class="modal-container-card" style="max-width: 480px;">
+      <div style="text-align: center; padding: 24px 20px 10px;">
+        <div style="width: 54px; height: 54px; border-radius: 50%; background: var(--surface-input); border: 1px solid var(--border-subtle); display: inline-flex; align-items: center; justify-content: center; color: var(--accent-amber); margin-bottom: 14px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3 class="modal-title">Письмо запечатано</h3>
+        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 12px 0 18px;">
+          Это письмо надежно запечатано до назначенной даты и времени открытия. Чтобы сохранить интригу для вас в будущем, заголовок и текст письма скрыты.
+        </p>
+
+        <div style="background: var(--surface-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; text-align: left; font-size: 13px; line-height: 1.6;" id="sealedLetterMetaDetails">
+          <!-- Injected via app.js -->
+        </div>
+
+        <div style="margin-top: 20px;">
+          <button class="btn-primary" style="width: 100%;" onclick="closeSealedLetterModal()">Понятно</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 5: SETTINGS SCREEN (1-to-1 SettingsScreen from Kotlin)
+       ====================================================================== -->
+  <div class="modal-overlay" id="settingsModalOverlay" style="display: none;">
+    <div class="modal-container-card" style="max-width: 520px;">
+      <div class="modal-header-row">
+        <div>
+          <h2 class="modal-title">Настройки</h2>
+          <span class="modal-subtitle">Аккаунт, язык и управление данными</span>
+        </div>
+        <button class="icon-control-btn" onclick="closeSettingsModal()" title="Закрыть">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-scrollable-content">
+        <!-- Account Card -->
+        <div class="bento-card" style="margin-bottom: 16px;">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Аккаунт синхронизации</h4>
+          <div id="settingsAuthSection"></div>
+        </div>
+
+        <!-- Language Mode (System / English / Russian) -->
+        <div class="bento-card" style="margin-bottom: 16px;">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">Язык интерфейса</h4>
+          <div style="display: flex; gap: 8px;">
+            <button class="filter-chip" id="langChipEn" onclick="setLanguage('en')">English</button>
+            <button class="filter-chip" id="langChipRu" onclick="setLanguage('ru')">Русский</button>
+          </div>
+        </div>
+
+        <!-- Theme Mode -->
+        <div class="bento-card" style="margin-bottom: 16px;">
+          <h4 style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">Цветовая тема</h4>
+          <div style="display: flex; gap: 8px;">
+            <button class="filter-chip" id="themeChipDark" onclick="applyThemeMode('dark')">Dark Cedar (Тёмная)</button>
+            <button class="filter-chip" id="themeChipLight" onclick="applyThemeMode('light')">Parchment (Светлая)</button>
+          </div>
+        </div>
+
+        <!-- Clear All Entries -->
+        <div class="bento-card" style="border-color: rgba(239, 68, 68, 0.3);">
+          <h4 style="font-size: 15px; font-weight: 700; color: #EF4444; margin-bottom: 6px;">Управление данными</h4>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">Удалить все сохраненные записи и письма из дневника.</p>
+          <button class="card-delete-btn" onclick="clearAllEntriesAction()" style="padding: 8px 16px; font-weight: 700;">
+            Очистить все записи
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer-row">
+        <button class="btn-primary" style="width: 100%;" onclick="closeSettingsModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

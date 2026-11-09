@@ -1722,8 +1722,8 @@ fun DiaryEntryEditorScreen(
                 placeholder = {
                     Text(
                         tr(
-                            "e.g., Deftones — Change, or a song on your mind...",
-                            "Например: Deftones — Change, или песня на уме..."
+                            "e.g., Billie Eilish — what was i made for?, The Weeknd, or a song on your mind...",
+                            "Например: Billie Eilish — what was i made for?, The Weeknd, или песня на уме..."
                         )
                     )
                 },
