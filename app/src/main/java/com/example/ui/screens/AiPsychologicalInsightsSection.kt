@@ -980,7 +980,7 @@ fun AiReportsArchiveBottomSheet(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = dominantMood.fullTitle(lang),
+                                        text = dominantMood.localizedTitle(lang),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.SemiBold
