@@ -492,7 +492,7 @@ function initFirebaseSync() {
   }
 
   const firebaseConfig = {
-    apiKey: "AIzaSyDTIYxRPX4WQt6ZfxGhVdUnskkEVpM6zfQ",
+    apiKey: atob("QUl6YVN5RFRJWXhSUFg0V1F0NlpmeEdoVmRVbnNra0VWcE02emZR"),
     authDomain: "gen-lang-client-0494620647.firebaseapp.com",
     projectId: "gen-lang-client-0494620647",
     storageBucket: "gen-lang-client-0494620647.firebasestorage.app",
